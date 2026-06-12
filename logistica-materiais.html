@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Logística de Materiais</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+var firebaseConfig = {
+  apiKey:"AIzaSyD4CeMxhKwKifhaXkjA2DB7AUwmoz1WIaM",
+  authDomain:"logistica-de-materias.firebaseapp.com",
+  databaseURL:"https://logistica-de-materias-default-rtdb.firebaseio.com",
+  projectId:"logistica-de-materias",
+  storageBucket:"logistica-de-materias.firebasestorage.app",
+  messagingSenderId:"525958204870",
+  appId:"1:525958204870:web:71919fad07fc9675eeb6c7"
+};
+firebase.initializeApp(firebaseConfig);
+var DB = firebase.database();
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#050e1a;color:#e2e8f0;min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1e3050;border-radius:99px}
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex;flex-direction:column}
+.screen-row.active{display:flex!important;flex-direction:row!important}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@keyframes slideIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulseGlow{0%,100%{box-shadow:0 0 8px rgba(16,185,129,.25)}50%{box-shadow:0 0 28px rgba(16,185,129,.6)}}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.6)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.anim-slideIn{animation:slideIn .25s ease}
+.pulse-glow{animation:pulseGlow 2s ease-in-out infinite}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+.live-dot::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:5px;vertical-align:middle;animation:pulseDot 1.5s ease-in-out infinite}
+.grid-bg{position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:44px 44px}
+.inp{width:100%;background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.08);border-radius:10px;padding:11px 14px;color:#e2e8f0;font-size:14px;font-weight:500;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s,box-shadow .2s}
+.inp::placeholder{color:#1e3a5f}
+.inp:focus{border-color:rgba(16,185,129,.4);box-shadow:0 0 0 3px rgba(16,185,129,.08)}
+.inp-error{border-color:#ef4444!important;animation:shake .4s ease}
+.nav-item{transition:all .2s;cursor:pointer;border-right:3px solid transparent}
+.nav-item.active{background:rgba(16,185,129,.12);color:#10b981;border-right-color:#10b981}
+.nav-item:not(.active):hover{background:rgba(255,255,255,.04)}
+.modal-wrap{opacity:0;pointer-events:none;transition:opacity .2s;position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:24px;z-index:999}
+.modal-wrap.open{opacity:1;pointer-events:all}
+.modal-box{background:#1a2d42;border:1px solid rgba(255,255,255,.1);border-radius:22px;padding:32px 28px;max-width:440px;width:100%;transform:scale(.88);transition:transform .25s}
+.modal-wrap.open .modal-box{transform:scale(1)}
+.form-panel{position:fixed;top:0;right:0;bottom:0;width:min(380px,100vw);background:#0a1628;border-left:1px solid rgba(255,255,255,.07);z-index:300;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.form-panel.open{transform:translateX(0)}
+.fp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:299;opacity:0;pointer-events:none;transition:opacity .3s}
+.fp-overlay.open{opacity:1;pointer-events:all}
+.k-col-body{min-height:120px;transition:background .2s}
+.k-col-body.drag-over{background:rgba(16,185,129,.07);outline:2px dashed rgba(16,185,129,.35);outline-offset:-4px;border-radius:10px}
+.k-card{cursor:grab;user-select:none;transition:transform .15s,box-shadow .15s}
+.k-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,0,0,.4)}
+.k-card:active{cursor:grabbing}
+.k-card.dragging{opacity:.25;transform:scale(.96)}
+.tab-btn{flex:1;padding:9px;border-radius:8px;border:none;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;background:transparent;color:#64748b}
+.tab-btn.active{background:rgba(255,255,255,.1);color:#e2e8f0}
+.stat-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:20px}
+.prog-step{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:1.5px solid rgba(255,255,255,.08);transition:all .35s}
+.prog-line{flex:1;height:2px;background:rgba(255,255,255,.06);transition:background .4s}
+.ac-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#1a2d42;border:1px solid rgba(255,255,255,.1);border-radius:10px;overflow:hidden;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.4);display:none}
+.ac-list.open{display:block}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 16px;text-align:left}
+tr{border-bottom:1px solid rgba(255,255,255,.05)}
+tr:hover td{background:rgba(255,255,255,.02)}
+#loading-screen{position:fixed;inset:0;background:#050e1a;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.btn-red{padding:7px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.08);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.btn-red:hover{background:rgba(239,68,68,.18)}
+.btn-amber{padding:7px 14px;border-radius:8px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.08);color:#f59e0b;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif}
+.badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div style="font-size:52px;filter:drop-shadow(0 0 20px rgba(16,185,129,.5))">📦</div>
+  <div style="font-size:20px;font-weight:800;color:#fff">Logística de Materiais</div>
+  <div class="spin" style="width:32px;height:32px;border:3px solid rgba(16,185,129,.2);border-top-color:#10b981;border-radius:50%"></div>
+  <div style="font-size:12px;color:#334155">Conectando...</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" style="position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-8px);padding:9px 22px;border-radius:99px;font-weight:700;font-size:13px;z-index:9999;pointer-events:none;opacity:0;transition:all .25s;white-space:nowrap;font-family:'Inter',sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5)"></div>
+
+<!-- ══════════════════════════════════════════════
+     TELA CLIENTE AUTH
+══════════════════════════════════════════════ -->
+<div id="screen-cli-auth" class="screen" style="background:radial-gradient(ellipse 70% 60% at 20% 20%,rgba(16,185,129,.06) 0%,transparent 60%),radial-gradient(ellipse 60% 70% at 80% 80%,rgba(59,130,246,.06) 0%,transparent 60%),#050e1a;align-items:center;justify-content:center;padding:20px">
+  <div style="position:relative;z-index:1;width:100%;max-width:440px">
+
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:52px;margin-bottom:12px;filter:drop-shadow(0 0 24px rgba(16,185,129,.55))">📦</div>
+      <h1 style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px">Logística de Materiais</h1>
+      <p style="color:#475569;font-size:13px;margin-top:6px">Acompanhe seus pedidos em tempo real</p>
+    </div>
+
+    <!-- Card principal -->
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:28px;backdrop-filter:blur(20px);box-shadow:0 30px 60px rgba(0,0,0,.4)">
+
+      <!-- Tabs login/cadastro -->
+      <div style="display:flex;background:rgba(255,255,255,.04);border-radius:11px;padding:4px;margin-bottom:22px">
+        <button class="tab-btn active" id="cli-tab-login" onclick="switchCliTab('login')">🔑 Entrar</button>
+        <button class="tab-btn" id="cli-tab-cad" onclick="switchCliTab('cadastro')">✨ Cadastrar</button>
+      </div>
+
+      <!-- ── MODO LOGIN ── -->
+      <div id="modo-login">
+        <!-- Login salvo -->
+        <div id="login-salvo-wrap" style="display:none;margin-bottom:14px">
+          <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Usuário salvo</div>
+              <div style="font-weight:700;font-size:14px;color:#fff" id="login-salvo-nome">—</div>
+            </div>
+            <button onclick="trocarUsuario()" style="background:none;border:none;color:#64748b;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:underline">Trocar</button>
+          </div>
+        </div>
+
+        <!-- Campo login (mostrado quando não há login salvo) -->
+        <div id="campo-login-wrap" style="margin-bottom:14px">
+          <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Login</label>
+          <input class="inp" id="inp-cli-login" placeholder="ex: joao123" type="text" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('inp-cli-senha').focus()"/>
+        </div>
+
+        <!-- Senha -->
+        <div style="margin-bottom:6px">
+          <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Senha (4 dígitos)</label>
+          <input class="inp" id="inp-cli-senha" type="password" placeholder="••••" maxlength="4" inputmode="numeric" style="letter-spacing:8px;font-size:22px" onkeydown="if(event.key==='Enter')cliAuthSubmit()"/>
+        </div>
+
+        <!-- Esqueceu a senha -->
+        <div style="text-align:right;margin-bottom:16px">
+          <button onclick="toggleRecuperacao()" style="background:none;border:none;color:#60a5fa;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif">Esqueceu a senha?</button>
+        </div>
+
+        <!-- Painel recuperação -->
+        <div id="rec-painel" style="display:none;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:12px;padding:16px;margin-bottom:16px">
+          <p style="color:#60a5fa;font-size:12px;font-weight:700;margin-bottom:12px;text-align:center">🔑 Recuperar Senha</p>
+          <div style="margin-bottom:10px">
+            <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Login</label>
+            <input class="inp" id="inp-rec-login" placeholder="ex: joao123" type="text" style="font-size:13px"/>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Nova Senha (4 dígitos)</label>
+            <input class="inp" id="inp-rec-nova" type="password" placeholder="••••" maxlength="4" inputmode="numeric" style="letter-spacing:8px;font-size:20px;text-align:center"/>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Confirmar Nova Senha</label>
+            <input class="inp" id="inp-rec-conf" type="password" placeholder="••••" maxlength="4" inputmode="numeric" style="letter-spacing:8px;font-size:20px;text-align:center"/>
+          </div>
+          <div id="rec-err" style="color:#f87171;font-size:12px;font-weight:600;margin-bottom:8px;display:none"></div>
+          <div id="rec-ok" style="color:#10b981;font-size:12px;font-weight:700;margin-bottom:8px;display:none;text-align:center">✓ Senha alterada com sucesso!</div>
+          <button onclick="recuperarSenha()" style="width:100%;padding:10px;border-radius:9px;border:none;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">REDEFINIR SENHA</button>
+        </div>
+
+        <div id="cli-login-err" style="color:#f87171;font-size:12px;font-weight:600;margin-bottom:12px;display:none"></div>
+        <button id="cli-auth-btn" onclick="cliAuthSubmit()" style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif">ENTRAR</button>
+      </div>
+
+      <!-- ── MODO CADASTRO ── -->
+      <div id="modo-cadastro" style="display:none">
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Seu Nome</label>
+          <input class="inp" id="inp-cad-nome" placeholder="João Silva" type="text"/>
+        </div>
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Login</label>
+          <input class="inp" id="inp-cad-login" placeholder="ex: joao123" type="text" autocomplete="username"/>
+        </div>
+        <div style="margin-bottom:20px">
+          <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Senha (4 dígitos)</label>
+          <input class="inp" id="inp-cad-senha" type="password" placeholder="••••" maxlength="4" inputmode="numeric" style="letter-spacing:8px;font-size:22px" onkeydown="if(event.key==='Enter')cliCadastrar()"/>
+        </div>
+        <div id="cli-cad-err" style="color:#f87171;font-size:12px;font-weight:600;margin-bottom:12px;display:none"></div>
+        <button onclick="cliCadastrar()" style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif">CRIAR CONTA</button>
+      </div>
+    </div>
+
+    <!-- QR Code -->
+    <div style="margin-top:20px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:18px;text-align:center">
+      <p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">📲 Acesso via QR Code</p>
+      <p style="color:#334155;font-size:12px;margin-bottom:12px">Escaneie para acessar pelo celular</p>
+      <div style="display:flex;justify-content:center;margin-bottom:12px">
+        <canvas id="qr-cli-canvas" style="border-radius:10px;border:2px solid rgba(16,185,129,.3)" width="130" height="130"></canvas>
+      </div>
+      <button onclick="imprimirQR()" style="padding:7px 18px;border-radius:8px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">🖨️ Imprimir QR Code</button>
+    </div>
+
+    <button onclick="goScreen('screen-op-login')" style="display:block;margin:14px auto 0;background:transparent;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:8px 18px;color:#334155;font-size:11px;font-family:'Inter',sans-serif;cursor:pointer;letter-spacing:1px">🔧 OPERADOR</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TELA CLIENTE HOME
+══════════════════════════════════════════════ -->
+<div id="screen-cli-home" class="screen" style="background:#050e1a">
+  <div style="position:sticky;top:0;z-index:50;background:rgba(5,14,26,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:20px">📦</div>
+      <div>
+        <div style="font-weight:900;font-size:16px;color:#fff">Logística de Materiais</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div id="cli-avatar" style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:8px;color:#fff">?</div>
+          <span class="live-dot" style="font-size:10px;font-weight:600;color:#10b981" id="cli-live">ao vivo</span>
+          <span style="color:#1e3a5f;font-size:10px">·</span>
+          <span style="font-size:10px;color:#475569;font-weight:600" id="cli-nome-top">—</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="cliLogout()" style="font-size:11px;font-weight:700;padding:7px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;cursor:pointer;font-family:'Inter',sans-serif">Sair</button>
+      <button onclick="goScreen('screen-op-login')" style="font-size:10px;font-weight:700;padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.06);background:transparent;color:#334155;cursor:pointer;font-family:'Inter',sans-serif">🔧</button>
+    </div>
+  </div>
+  <div style="flex:1;padding:20px;max-width:520px;margin:0 auto;width:100%">
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px;margin-bottom:20px">
+      <p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Inserir Número do Pedido</p>
+      <p style="color:#475569;font-size:13px;margin-bottom:14px">Digite o número de <strong style="color:#fff">7 dígitos</strong> do seu pedido. Ele aparecerá no painel da operação.</p>
+      <div style="display:flex;gap:10px">
+        <input class="inp" id="cli-inp-num" placeholder="ex: 1234567" inputmode="numeric" maxlength="7"
+          style="font-size:18px;font-weight:800;letter-spacing:3px;font-family:'DM Mono',monospace;flex:1"
+          oninput="this.value=this.value.replace(/\D/g,'').slice(0,7)"
+          onkeydown="if(event.key==='Enter')cliAddPedido()"/>
+        <button onclick="cliAddPedido()" style="padding:12px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-size:20px;font-weight:900;cursor:pointer;flex-shrink:0;box-shadow:0 4px 14px rgba(16,185,129,.3)">→</button>
+      </div>
+      <div id="cli-num-err" style="color:#f87171;font-size:12px;font-weight:600;margin-top:8px;display:none"></div>
+    </div>
+    <div id="cli-pedidos-wrap"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TELA OP LOGIN
+══════════════════════════════════════════════ -->
+<div id="screen-op-login" class="screen" style="background:#050e1a;align-items:center;justify-content:center">
+  <div style="position:relative;z-index:1;width:100%;max-width:360px;padding:24px">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-size:48px;margin-bottom:12px">🔐</div>
+      <h1 style="font-size:24px;font-weight:900;color:#fff">Painel da Operação</h1>
+      <p style="color:#475569;font-size:13px;margin-top:8px">Acesso restrito à equipe</p>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:28px">
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Senha</label>
+      <input class="inp" id="inp-op-senha" type="password" placeholder="••••" style="font-size:22px;letter-spacing:8px;margin-bottom:14px" onkeydown="if(event.key==='Enter')opLogin()"/>
+      <div id="op-senha-err" style="color:#f87171;font-size:12px;font-weight:600;margin-bottom:12px;display:none">Senha incorreta.</div>
+      <button onclick="opLogin()" style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:10px">ENTRAR</button>
+      <button onclick="goScreen('screen-cli-auth')" style="width:100%;padding:11px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">← Voltar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TELA OPERADOR
+══════════════════════════════════════════════ -->
+<div id="screen-operador" class="screen" style="background:#050e1a">
+  <aside style="width:220px;min-height:100vh;background:#0a1628;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh">
+    <div style="padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">📦</span>
+        <div>
+          <div style="font-weight:800;font-size:13px;color:#fff">Logística de Materiais</div>
+          <div style="font-size:10px;color:#334155;font-family:'DM Mono',monospace" id="op-summary-side">—</div>
+        </div>
+      </div>
+    </div>
+    <nav style="flex:1;padding:8px 0;overflow-y:auto">
+      <button class="nav-item active" id="nav-kanban" onclick="switchOpTab('kanban')" style="width:100%;text-align:left;padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;border:none;background:transparent;color:#10b981;font-family:'Inter',sans-serif">📦 Kanban</button>
+      <button class="nav-item" id="nav-dashboard" onclick="switchOpTab('dashboard')" style="width:100%;text-align:left;padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;border:none;background:transparent;color:#64748b;font-family:'Inter',sans-serif">📊 Dashboard</button>
+      <button class="nav-item" id="nav-relatorio" onclick="switchOpTab('relatorio')" style="width:100%;text-align:left;padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;border:none;background:transparent;color:#64748b;font-family:'Inter',sans-serif">📋 Relatório</button>
+      <button class="nav-item" id="nav-clientes" onclick="switchOpTab('clientes')" style="width:100%;text-align:left;padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;border:none;background:transparent;color:#64748b;font-family:'Inter',sans-serif">👥 Parceiros</button>
+      <button class="nav-item" id="nav-logs" onclick="switchOpTab('logs')" style="width:100%;text-align:left;padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;border:none;background:transparent;color:#64748b;font-family:'Inter',sans-serif">📝 Registro</button>
+      <!-- Novo Pedido abaixo de Registro -->
+      <div style="padding:10px 12px 4px">
+        <button onclick="openFP()" style="width:100%;padding:11px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:8px;justify-content:center;box-shadow:0 4px 14px rgba(16,185,129,.3)">
+          ➕ Novo Pedido
+        </button>
+      </div>
+    </nav>
+    <div style="padding:12px;border-top:1px solid rgba(255,255,255,.06)">
+      <button onclick="opLogout()" style="width:100%;padding:9px;border-radius:10px;border:1px solid rgba(239,68,68,.2);background:rgba(239,68,68,.06);color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">Sair 🚪</button>
+    </div>
+  </aside>
+
+  <main style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden">
+    <div style="position:sticky;top:0;z-index:40;background:rgba(5,14,26,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div>
+        <h2 style="font-weight:900;font-size:17px;color:#fff" id="op-page-title">Kanban</h2>
+        <p style="font-size:11px;color:#334155;margin-top:1px" id="op-page-sub">Arraste os cards · 🔴 tempo real</p>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button onclick="showModal('modal-qr')" style="font-size:11px;font-weight:700;padding:8px 12px;border-radius:9px;border:1px solid rgba(59,130,246,.25);background:rgba(59,130,246,.08);color:#60a5fa;cursor:pointer;font-family:'Inter',sans-serif">📲 QR Balcão</button>
+        <button onclick="exportExcel()" style="font-size:11px;font-weight:700;padding:8px 12px;border-radius:9px;border:1px solid rgba(139,92,246,.25);background:rgba(139,92,246,.08);color:#a78bfa;cursor:pointer;font-family:'Inter',sans-serif">📥 Excel</button>
+        <button onclick="backupJSON()" style="font-size:11px;font-weight:700;padding:8px 12px;border-radius:9px;border:1px solid rgba(245,158,11,.25);background:rgba(245,158,11,.08);color:#f59e0b;cursor:pointer;font-family:'Inter',sans-serif">💾 Backup</button>
+      </div>
+    </div>
+
+    <!-- KANBAN -->
+    <div id="aba-kanban" style="flex:1;padding:12px;overflow:auto;display:flex;flex-direction:column">
+      <p style="font-size:10px;font-weight:700;color:#1e3a5f;letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">⬅ arraste os cards · no celular: toque para avançar · 🔴 tempo real</p>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:1">
+        <!-- Col Criado -->
+        <div style="display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)">
+          <div style="padding:11px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(245,158,11,.18)">
+            <span style="font-weight:800;font-size:10px;color:#f59e0b;text-transform:uppercase">📋 Pedido Criado</span>
+            <span style="font-size:11px;font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(245,158,11,.15);color:#f59e0b;font-family:'DM Mono',monospace" id="cnt-criado">0</span>
+          </div>
+          <div class="k-col-body" id="body-criado" style="flex:1;padding:7px;overflow-y:auto;display:flex;flex-direction:column;gap:6px" ondragover="onDragOver(event,'criado')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'criado')"></div>
+        </div>
+        <!-- Col Separação -->
+        <div style="display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)">
+          <div style="padding:11px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(59,130,246,.18)">
+            <span style="font-weight:800;font-size:10px;color:#3b82f6;text-transform:uppercase">📦 Em Separação</span>
+            <span style="font-size:11px;font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(59,130,246,.15);color:#3b82f6;font-family:'DM Mono',monospace" id="cnt-separacao">0</span>
+          </div>
+          <div class="k-col-body" id="body-separacao" style="flex:1;padding:7px;overflow-y:auto;display:flex;flex-direction:column;gap:6px" ondragover="onDragOver(event,'separacao')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'separacao')"></div>
+        </div>
+        <!-- Col Pronto -->
+        <div style="display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)">
+          <div style="padding:11px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(16,185,129,.18)">
+            <span style="font-weight:800;font-size:10px;color:#10b981;text-transform:uppercase">✅ Pronto p/ Retirada</span>
+            <span style="font-size:11px;font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(16,185,129,.15);color:#10b981;font-family:'DM Mono',monospace" id="cnt-pronto">0</span>
+          </div>
+          <div class="k-col-body" id="body-pronto" style="flex:1;padding:7px;overflow-y:auto;display:flex;flex-direction:column;gap:6px" ondragover="onDragOver(event,'pronto')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'pronto')"></div>
+        </div>
+        <!-- Col Entregue -->
+        <div style="display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)">
+          <div style="padding:11px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(139,92,246,.18)">
+            <span style="font-weight:800;font-size:10px;color:#8b5cf6;text-transform:uppercase">🎁 Entregue</span>
+            <span style="font-size:11px;font-weight:800;padding:2px 7px;border-radius:99px;background:rgba(139,92,246,.15);color:#8b5cf6;font-family:'DM Mono',monospace" id="cnt-entregue">0</span>
+          </div>
+          <div class="k-col-body" id="body-entregue" style="flex:1;padding:7px;overflow-y:auto;display:flex;flex-direction:column;gap:6px" ondragover="onDragOver(event,'entregue')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'entregue')"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="aba-dashboard" style="flex:1;padding:16px 22px;overflow-y:auto;display:none">
+
+      <!-- LINHA 1 — KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+        <div class="stat-card"><p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Hoje</p><p style="font-size:32px;font-weight:900;color:#fff" id="kpi-hoje">0</p><p style="font-size:11px;color:#334155;margin-top:3px">pedidos</p></div>
+        <div class="stat-card"><p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Este Mês</p><p style="font-size:32px;font-weight:900;color:#10b981" id="kpi-mes">0</p><p style="font-size:11px;color:#334155;margin-top:3px">pedidos</p></div>
+        <div class="stat-card"><p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Tempo Médio</p><p style="font-size:32px;font-weight:900;color:#3b82f6" id="kpi-tempo">—</p><p style="font-size:11px;color:#334155;margin-top:3px">min/pedido</p></div>
+        <div class="stat-card"><p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">Pico Principal</p><p style="font-size:32px;font-weight:900;color:#f59e0b" id="kpi-pico">—</p><p style="font-size:11px;color:#334155;margin-top:3px">horário</p></div>
+      </div>
+
+      <!-- LINHA 2 — Picos + Alertas + Reforço (visíveis sem scroll) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+
+        <!-- Horários de Pico -->
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <p style="font-size:12px;font-weight:700;color:#fff;margin-bottom:12px">⏰ Horários de Pico</p>
+          <div id="dash-picos"><p style="color:#334155;font-size:12px">Sem dados.</p></div>
+        </div>
+
+        <!-- Alertas Rápidos -->
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <p style="font-size:12px;font-weight:700;color:#fff;margin-bottom:12px">🔔 Alertas Rápidos</p>
+          <div id="dash-alertas"><p style="color:#334155;font-size:12px">Sem alertas.</p></div>
+        </div>
+
+        <!-- Sugestão de Reforço -->
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <p style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px">👥 Sugestão de Reforço</p>
+          <p style="font-size:10px;color:#475569;margin-bottom:10px">Baseado no histórico</p>
+          <div id="dash-reforco"><p style="color:#334155;font-size:12px">Sem dados.</p></div>
+        </div>
+
+      </div>
+
+      <!-- LINHA 3 — Gráfico Pedidos por Mês (largura total) -->
+      <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px;margin-bottom:10px">
+        <!-- Indicadores acima do gráfico -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+          <p style="font-size:13px;font-weight:700;color:#fff">📈 Pedidos Atendidos por Mês</p>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <span id="dash-mes-melhor" style="font-size:12px;font-weight:700;color:#10b981">📈 Melhor mês: —</span>
+            <span id="dash-mes-menor"  style="font-size:12px;font-weight:700;color:#f87171">📉 Menor mês: —</span>
+            <span id="dash-mes-media"  style="font-size:12px;font-weight:700;color:#a78bfa">📊 Média mensal: —</span>
+          </div>
+        </div>
+        <canvas id="chart-meses" height="100"></canvas>
+      </div>
+
+      <!-- LINHA 4 — Gráficos temporais -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <p style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px">📅 Pedidos por Dia — últimos 14 dias</p>
+          <canvas id="chart-dias" height="160"></canvas>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <p style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px">🕐 Distribuição por Hora</p>
+          <canvas id="chart-horas" height="160"></canvas>
+        </div>
+      </div>
+
+      <!-- LINHA 4 — Status + Tempo por etapa -->
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <p style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px">📊 Status Atual</p>
+          <canvas id="chart-status" height="140" style="margin-bottom:10px"></canvas>
+          <div id="dash-status-detail"></div>
+        </div>
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <p style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px">⏱ Tempo Médio por Etapa <span style="font-size:10px;color:#334155;font-weight:500">(vermelho = etapa mais lenta)</span></p>
+          <canvas id="chart-etapas" height="180"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RELATÓRIO -->
+    <div id="aba-relatorio" style="flex:1;padding:22px;overflow-y:auto;display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div><h3 style="font-weight:900;color:#fff;font-size:15px">Histórico de Pedidos</h3><p style="font-size:11px;color:#334155;margin-top:2px">Dados em tempo real</p></div>
+        <button onclick="exportExcel()" style="padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif">📥 Excel</button>
+      </div>
+      <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.07)">
+        <table>
+          <thead style="background:rgba(255,255,255,.04)">
+            <tr>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Pedido</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Parceiro</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Status</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Criado em</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Atualizado</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase;text-align:right">Tempo Total</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-pedidos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CLIENTES (Gestão completa) -->
+    <div id="aba-clientes" style="flex:1;padding:22px;overflow-y:auto;display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <h3 style="font-weight:900;color:#fff;font-size:15px">Gestão de Parceiros</h3>
+        <div style="display:flex;gap:8px">
+          <input class="inp" id="inp-busca-cli" placeholder="🔍 Buscar por nome ou login..." oninput="filtrarClientes(this.value)" style="width:240px;font-size:13px;padding:9px 13px"/>
+        </div>
+      </div>
+      <div id="lista-parceiros" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <!-- REGISTRO (Logs) -->
+    <div id="aba-logs" style="flex:1;padding:22px;overflow-y:auto;display:none">
+      <h3 style="font-weight:900;color:#fff;font-size:15px;margin-bottom:16px">📝 Registro de Alterações</h3>
+      <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.07)">
+        <table>
+          <thead style="background:rgba(255,255,255,.04)">
+            <tr>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Data/Hora</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Operador</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Ação</th>
+              <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Detalhes</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-logs"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- FORM PANEL (novo pedido) -->
+<div class="fp-overlay" id="fp-overlay" onclick="closeFP()"></div>
+<div class="form-panel" id="form-panel">
+  <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <span style="font-weight:800;font-size:15px;color:#fff">➕ Novo Pedido</span>
+    <button onclick="closeFP()" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer">✕</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px">
+    <div>
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Nº do Pedido * (7 dígitos)</label>
+      <input class="inp" id="fp-num" placeholder="ex: 1234567" inputmode="numeric" maxlength="7"
+        style="font-size:18px;font-weight:800;letter-spacing:3px;font-family:'DM Mono',monospace"
+        oninput="this.value=this.value.replace(/\D/g,'').slice(0,7)"
+        onkeydown="if(event.key==='Enter')criarPedidoOp()"/>
+    </div>
+    <div id="fp-sel-wrap" style="display:none">
+      <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between">
+        <div><div style="font-weight:700;font-size:14px;color:#fff" id="fp-sel-nome">—</div><div style="font-size:11px;color:#64748b;font-family:'DM Mono',monospace" id="fp-sel-login">—</div></div>
+        <button onclick="limparCliForm()" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div style="position:relative" id="fp-ac-wrap">
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Buscar Parceiro</label>
+      <input class="inp" id="fp-busca" placeholder="Nome ou usuário..." oninput="buscarCliForm(this.value)" autocomplete="off"/>
+      <div class="ac-list" id="autocomplete-list"></div>
+    </div>
+    <div id="fp-avulso-wrap">
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Ou Nome Avulso</label>
+      <input class="inp" id="fp-avulso" placeholder="Nome do parceiro..."/>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Observações (opcional)</label>
+      <textarea class="inp" id="fp-obs" placeholder="Ex: parceiro com dificuldade, pedido corrigido..." rows="2" style="resize:none;line-height:1.5"></textarea>
+    </div>
+    <button onclick="criarPedidoOp()" style="padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;margin-top:4px">+ CRIAR PEDIDO</button>
+  </div>
+</div>
+
+<!-- MODAL QR BALCÃO -->
+<div class="modal-wrap" id="modal-qr" onclick="closeModal('modal-qr')">
+  <div class="modal-box" onclick="event.stopPropagation()" style="text-align:center">
+    <div style="font-size:36px;margin-bottom:10px">📲</div>
+    <h3 style="font-weight:900;color:#fff;font-size:18px;margin-bottom:8px">QR Code do Balcão</h3>
+    <p style="color:#64748b;font-size:13px;margin-bottom:18px;line-height:1.5">Imprima e cole no balcão para o parceiro escanear.</p>
+    <div style="display:flex;justify-content:center;margin-bottom:14px">
+      <canvas id="qr-balcao-canvas" style="border-radius:12px;border:2px solid rgba(16,185,129,.3)" width="180" height="180"></canvas>
+    </div>
+    <p id="qr-url-txt" style="font-size:10px;color:#334155;word-break:break-all;margin-bottom:18px;font-family:'DM Mono',monospace"></p>
+    <div style="display:flex;gap:10px">
+      <button onclick="imprimirQR()" style="flex:1;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">🖨️ Imprimir</button>
+      <button onclick="closeModal('modal-qr')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DELETAR PEDIDO -->
+<div class="modal-wrap" id="modal-del-ped" onclick="closeModal('modal-del-ped')">
+  <div class="modal-box" onclick="event.stopPropagation()" style="text-align:center">
+    <div style="font-size:36px;margin-bottom:10px">🗑️</div>
+    <h3 style="font-weight:900;color:#fff;font-size:18px;margin-bottom:8px">Excluir pedido?</h3>
+    <p style="color:#64748b;font-size:13px;margin-bottom:6px">Pedido <strong id="del-ped-num" style="color:#fff">—</strong> será excluído.</p>
+    <p style="color:#f59e0b;font-size:12px;margin-bottom:18px">O parceiro receberá uma notificação para reenviar o pedido correto.</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal('modal-del-ped')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
+      <button id="del-ped-btn" style="flex:1;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR EXCLUIR CLIENTE -->
+<div class="modal-wrap" id="modal-del-cli" onclick="closeModal('modal-del-cli')">
+  <div class="modal-box" onclick="event.stopPropagation()" style="text-align:center">
+    <div style="font-size:36px;margin-bottom:10px">🗑️</div>
+    <h3 style="font-weight:900;color:#fff;font-size:18px;margin-bottom:8px">Deseja excluir este parceiro?</h3>
+    <p style="color:#64748b;font-size:13px;margin-bottom:20px">Parceiro <strong id="del-cli-nome" style="color:#fff">—</strong> será removido permanentemente.</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal('modal-del-cli')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
+      <button id="del-cli-btn" style="flex:1;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR CLIENTE -->
+<div class="modal-wrap" id="modal-edit-cli" onclick="closeModal('modal-edit-cli')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3 style="font-weight:900;color:#fff;font-size:17px;margin-bottom:20px;text-align:center">✏️ Editar Parceiro</h3>
+    <div style="margin-bottom:14px;text-align:left">
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Nome</label>
+      <input class="inp" id="edit-cli-nome" placeholder="Nome do parceiro" type="text"/>
+    </div>
+    <div style="margin-bottom:14px;text-align:left">
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Login (único)</label>
+      <input class="inp" id="edit-cli-login" placeholder="Login único" type="text"/>
+    </div>
+    <div style="margin-bottom:6px;text-align:left">
+      <label style="display:block;font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">Nova Senha (deixe em branco para não alterar)</label>
+      <input class="inp" id="edit-cli-senha" type="password" placeholder="••••" maxlength="4" inputmode="numeric" style="letter-spacing:8px;font-size:20px;text-align:center"/>
+    </div>
+    <div id="edit-cli-err" style="color:#f87171;font-size:12px;font-weight:600;margin-bottom:10px;margin-top:8px;display:none"></div>
+    <div id="edit-cli-ok" style="color:#10b981;font-size:12px;font-weight:700;margin-bottom:10px;display:none;text-align:center">✓ Cadastro atualizado com sucesso.</div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal('modal-edit-cli')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
+      <button onclick="salvarEdicaoCli()" style="flex:1;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════ JAVASCRIPT ════════════════════════ -->
+<script>
+// ── CONFIG ───────────────────────────────────────────────
+var SENHA_OP    = "1234";
+var OPERADOR_ID = "Operador";
+var STATUS = {
+  criado:    { label:"Pedido Criado",       icon:"📋", color:"#f59e0b", step:1 },
+  separacao: { label:"Em Separação",        icon:"📦", color:"#3b82f6", step:2 },
+  pronto:    { label:"Pronto p/ Retirada",  icon:"✅", color:"#10b981", step:3 },
+  entregue:  { label:"Entregue",            icon:"🎁", color:"#8b5cf6", step:4 },
+};
+var ORDEM = ["criado","separacao","pronto","entregue"];
+
+// ── STATE ─────────────────────────────────────────────────
+var pedidos      = {};
+var clientes     = {};
+var logs         = {};
+var cliLogado    = null;
+var cliNums      = [];
+var lastStatuses = {};
+var dragNum      = null;
+var opTab        = "kanban";
+var cliFormId    = null;
+var charts       = {};
+var opListeners  = [];
+var editCliId    = null;
+var clisFiltrados= [];
+
+// ── UTILS ─────────────────────────────────────────────────
+function fmtTel(t){ return (t||"").replace(/\D/g,""); }
+function fmtDate(d){ return new Date(d).toLocaleString("pt-BR"); }
+function fmtDateSh(d){ return new Date(d).toLocaleDateString("pt-BR"); }
+function uid(){ return "c_"+Date.now()+"_"+Math.random().toString(36).slice(2,6); }
+function hashPin(p){ return btoa("rp9::"+p); }
+function minDiff(a,b){ return Math.round((new Date(b)-new Date(a))/60000); }
+function tempoTotal(p){
+  if(!p.createdAt) return "—";
+  var fim = (p.etapas&&p.etapas.entregue)?p.etapas.entregue:p.updatedAt;
+  var m = minDiff(p.createdAt,fim);
+  if(m<1) return "<1 min"; if(m<60) return m+" min";
+  return Math.floor(m/60)+"h "+(m%60)+"min";
+}
+
+function toast(txt,type){
+  type=type||"ok";
+  var el=document.getElementById("toast");
+  el.textContent=txt;
+  el.style.background=type==="err"?"#dc2626":type==="warn"?"#d97706":"#059669";
+  el.style.opacity="1"; el.style.transform="translateX(-50%) translateY(0)";
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){ el.style.opacity="0"; el.style.transform="translateX(-50%) translateY(-8px)"; },2800);
+}
+
+function goScreen(id){
+  document.querySelectorAll(".screen").forEach(function(s){ s.classList.remove("active","screen-row"); });
+  var el=document.getElementById(id);
+  el.classList.add("active");
+  if(id==="screen-operador") el.classList.add("screen-row");
+  window.scrollTo(0,0);
+  if(id!=="screen-cli-home"&&id!=="screen-operador") stopAllListeners();
+}
+
+function showModal(id){
+  document.getElementById(id).classList.add("open");
+  if(id==="modal-qr"){
+    var url = getSysURL();
+    document.getElementById("qr-url-txt").textContent = url;
+    var c = document.getElementById("qr-balcao-canvas");
+    if(c) gerarQRCanvas(c, url, 180);
+  }
+}
+function closeModal(id){ document.getElementById(id).classList.remove("open"); }
+
+function gerarQRCanvas(canvas,texto,size){
+  try{
+    var div=document.createElement("div");
+    new QRCode(div,{text:texto,width:size,height:size,colorDark:"#10b981",colorLight:"#050e1a",correctLevel:QRCode.CorrectLevel.M});
+    setTimeout(function(){
+      var img=div.querySelector("img")||div.querySelector("canvas");
+      if(!img) return;
+      var ctx=canvas.getContext("2d");
+      ctx.drawImage(img,0,0,size,size);
+    },100);
+  }catch(e){
+    // fallback: usa API externa
+    var img2=new Image();
+    img2.crossOrigin="anonymous";
+    img2.onload=function(){canvas.getContext("2d").drawImage(img2,0,0,size,size);};
+    img2.src="https://api.qrserver.com/v1/create-qr-code/?size="+size+"x"+size+"&data="+encodeURIComponent(texto)+"&bgcolor=050e1a&color=10b981&margin=6";
+  }
+}
+
+function whatsLink(tel,num,nome){
+  var msg="Olá "+nome+"! 🎉 Seu pedido *"+num+"* está *pronto para retirada*. Dirija-se ao balcão. Obrigado!";
+  return "https://wa.me/55"+fmtTel(tel)+"?text="+encodeURIComponent(msg);
+}
+
+// ── SOM ───────────────────────────────────────────────────
+function playNotif(type){
+  try{
+    var ctx=new(window.AudioContext||window.webkitAudioContext)();
+    var freqs;
+    if(type==="pronto")      freqs=[880,1100,1320,1540];
+    else if(type==="err")    freqs=[440,330,220];  // som descendente para erro/exclusão
+    else                     freqs=[660,880,1100];
+    freqs.forEach(function(f,i){
+      var o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=f;o.type="sine";
+      var t=ctx.currentTime+i*0.13;
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.2,t+0.04);g.gain.linearRampToValueAtTime(0,t+0.18);
+      o.start(t);o.stop(t+0.2);
+    });
+  }catch(e){}
+}
+
+// ── FIREBASE ──────────────────────────────────────────────
+function stopAllListeners(){
+  opListeners.forEach(function(ref){ try{ref.off();}catch(e){} });
+  opListeners=[];
+}
+
+function registrarLog(acao,detalhes){
+  var agora = new Date();
+  var log={
+    data:    agora.toISOString(),
+    dataFmt: agora.toLocaleString("pt-BR"),
+    operador:OPERADOR_ID,
+    acao:    acao||"",
+    detalhes:detalhes||""
+  };
+  DB.ref("logs").push(log);
+}
+
+// ── CLIENTE AUTH ──────────────────────────────────────────
+function switchCliTab(tab){
+  document.getElementById("cli-tab-login").classList.toggle("active",tab==="login");
+  document.getElementById("cli-tab-cad").classList.toggle("active",tab==="cadastro");
+  document.getElementById("modo-login").style.display  = tab==="login"?"block":"none";
+  document.getElementById("modo-cadastro").style.display= tab==="cadastro"?"block":"none";
+}
+
+// Login salvo
+function carregarLoginSalvo(){
+  var salvo = localStorage.getItem("cli-login-salvo");
+  if(salvo){
+    document.getElementById("login-salvo-wrap").style.display="block";
+    document.getElementById("campo-login-wrap").style.display="none";
+    document.getElementById("login-salvo-nome").textContent=salvo;
+    document.getElementById("inp-cli-login").value=salvo;
+  } else {
+    document.getElementById("login-salvo-wrap").style.display="none";
+    document.getElementById("campo-login-wrap").style.display="block";
+  }
+}
+
+function trocarUsuario(){
+  localStorage.removeItem("cli-login-salvo");
+  document.getElementById("login-salvo-wrap").style.display="none";
+  document.getElementById("campo-login-wrap").style.display="block";
+  document.getElementById("inp-cli-login").value="";
+  document.getElementById("inp-cli-senha").value="";
+  document.getElementById("cli-login-err").style.display="none";
+}
+
+function cliAuthSubmit(){
+  var login=(document.getElementById("inp-cli-login").value||"").trim().toLowerCase();
+  var senha=(document.getElementById("inp-cli-senha").value||"").trim();
+  var errEl=document.getElementById("cli-login-err");
+  errEl.style.display="none";
+  if(!login){ errEl.textContent="Digite seu usuário."; errEl.style.display="block"; return; }
+  if(senha.length!==4||isNaN(Number(senha))){ errEl.textContent="Senha deve ter exatamente 4 dígitos."; errEl.style.display="block"; return; }
+  var hash=hashPin(senha);
+  DB.ref("clientes").orderByChild("login").equalTo(login).once("value",function(snap){
+    if(!snap.exists()){ errEl.textContent="Usuário não encontrado."; errEl.style.display="block"; return; }
+    var found=null;
+    snap.forEach(function(c){ found=c.val(); });
+    if(found.senha!==hash){ errEl.textContent="Senha incorreta."; errEl.style.display="block"; return; }
+    // Salva login no dispositivo
+    localStorage.setItem("cli-login-salvo",login);
+    doLoginCli(found);
+  });
+}
+
+function cliCadastrar(){
+  var nome=(document.getElementById("inp-cad-nome").value||"").trim();
+  var login=(document.getElementById("inp-cad-login").value||"").trim().toLowerCase();
+  var senha=(document.getElementById("inp-cad-senha").value||"").trim();
+  var errEl=document.getElementById("cli-cad-err");
+  errEl.style.display="none";
+  if(!nome){ errEl.textContent="Digite seu nome."; errEl.style.display="block"; return; }
+  if(!login){ errEl.textContent="Digite um login."; errEl.style.display="block"; return; }
+  if(senha.length!==4||isNaN(Number(senha))){ errEl.textContent="Senha deve ter exatamente 4 dígitos."; errEl.style.display="block"; return; }
+  var hash=hashPin(senha);
+  DB.ref("clientes").orderByChild("login").equalTo(login).once("value",function(snap){
+    if(snap.exists()){ errEl.textContent="Este login já está em uso. Escolha outro."; errEl.style.display="block"; return; }
+    var c={id:uid(),login:login,senha:hash,nome:nome,tel:"",criadoEm:new Date().toISOString()};
+    DB.ref("clientes/"+c.id).set(c,function(err){
+      if(err){ errEl.textContent="Erro ao cadastrar. Tente novamente."; errEl.style.display="block"; return; }
+      localStorage.setItem("cli-login-salvo",login);
+      doLoginCli(c);
+    });
+  });
+}
+
+function doLoginCli(c){
+  cliLogado=c;
+  try{ cliNums=JSON.parse(localStorage.getItem("rp-nums-"+c.id)||"[]"); }catch{ cliNums=[]; }
+  lastStatuses={};
+  document.getElementById("cli-avatar").textContent=c.nome.charAt(0).toUpperCase();
+  document.getElementById("cli-nome-top").textContent=c.nome;
+  stopAllListeners();
+  var refPed=DB.ref("pedidos");
+  refPed.on("value",function(snap){
+    var novos=snap.val()||{};
+    cliNums.forEach(function(n){
+      if(novos[n]&&lastStatuses[n]&&lastStatuses[n]!==novos[n].status){
+        if(novos[n].status==="excluido"){
+          playNotif("err");
+          toast("⚠️ Pedido #"+n+" foi removido pela operação","warn");
+        } else {
+          playNotif(novos[n].status);
+          toast("📦 Pedido #"+n+" → "+(STATUS[novos[n].status]&&STATUS[novos[n].status].label||""));
+        }
+      }
+      if(novos[n]) lastStatuses[n]=novos[n].status;
+    });
+    pedidos=novos;
+    renderCliPedidos();
+    var el=document.getElementById("cli-live");
+    if(el) el.textContent="ao vivo · "+new Date().toLocaleTimeString("pt-BR");
+  });
+  opListeners.push(refPed);
+  startAlertasCliente();
+  goScreen("screen-cli-home");
+}
+
+function cliLogout(){
+  cliLogado=null; cliNums=[]; lastStatuses={};
+  document.getElementById("inp-cli-senha").value="";
+  document.getElementById("cli-login-err").style.display="none";
+  stopAllListeners();
+  carregarLoginSalvo();
+  goScreen("screen-cli-auth");
+}
+
+function saveCliNums(){
+  if(!cliLogado) return;
+  localStorage.setItem("rp-nums-"+cliLogado.id,JSON.stringify(cliNums));
+}
+
+// ── RECUPERAR SENHA ───────────────────────────────────────
+function toggleRecuperacao(){
+  var p=document.getElementById("rec-painel");
+  p.style.display=p.style.display==="none"?"block":"none";
+}
+
+function recuperarSenha(){
+  var login=(document.getElementById("inp-rec-login").value||"").trim().toLowerCase();
+  var nova=(document.getElementById("inp-rec-nova").value||"").trim();
+  var conf=(document.getElementById("inp-rec-conf").value||"").trim();
+  var errEl=document.getElementById("rec-err");
+  var okEl=document.getElementById("rec-ok");
+  errEl.style.display="none"; okEl.style.display="none";
+  if(!login){ errEl.textContent="Digite seu usuário."; errEl.style.display="block"; return; }
+  if(nova.length!==4||isNaN(Number(nova))){ errEl.textContent="Nova senha deve ter exatamente 4 dígitos."; errEl.style.display="block"; return; }
+  if(nova!==conf){ errEl.textContent="As senhas não coincidem."; errEl.style.display="block"; return; }
+  DB.ref("clientes").orderByChild("login").equalTo(login).once("value",function(snap){
+    if(!snap.exists()){ errEl.textContent="Login não encontrado."; errEl.style.display="block"; return; }
+    var foundKey=null;
+    snap.forEach(function(c){ foundKey=c.key; });
+    DB.ref("clientes/"+foundKey+"/senha").set(hashPin(nova),function(err){
+      if(err){ errEl.textContent="Erro ao atualizar. Tente novamente."; errEl.style.display="block"; return; }
+      okEl.textContent="Senha alterada com sucesso."; okEl.style.display="block";
+      document.getElementById("inp-rec-login").value="";
+      document.getElementById("inp-rec-nova").value="";
+      document.getElementById("inp-rec-conf").value="";
+      setTimeout(function(){ document.getElementById("rec-painel").style.display="none"; okEl.style.display="none"; },3000);
+    });
+  });
+}
+
+// ── PEDIDO CLIENTE ────────────────────────────────────────
+function cliAddPedido(){
+  var errEl=document.getElementById("cli-num-err");
+  errEl.style.display="none";
+  var num=(document.getElementById("cli-inp-num").value||"").trim().replace(/\D/g,"");
+  if(!num||num.length===0){ errEl.textContent="Digite o número do pedido."; errEl.style.display="block"; return; }
+  if(num.length!==7){ errEl.textContent="O número do pedido deve ter 7 dígitos."; errEl.style.display="block"; return; }
+  if(cliNums.indexOf(num)>=0){ errEl.textContent="Você já está acompanhando este pedido."; errEl.style.display="block"; return; }
+  var novoPed={
+    numero:num, clienteId:cliLogado.id, nomeAvulso:null,
+    status:"criado", createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString(),
+    etapas:{criado:new Date().toISOString()}
+  };
+  DB.ref("pedidos/"+num).set(novoPed,function(err){
+    if(err){ toast("Erro ao registrar pedido","err"); return; }
+    toast("✓ Pedido #"+num+" registrado!");
+    playNotif("criado");
+  });
+  cliNums.unshift(num);
+  saveCliNums();
+  document.getElementById("cli-inp-num").value="";
+  renderCliPedidos();
+}
+
+function cliRemovePedido(num){
+  cliNums=cliNums.filter(function(n){return n!==num;});
+  delete lastStatuses[num];
+  saveCliNums();
+  renderCliPedidos();
+}
+
+function renderCliPedidos(){
+  var wrap=document.getElementById("cli-pedidos-wrap");
+  if(!cliNums.length){
+    wrap.innerHTML='<div style="text-align:center;padding:48px 20px"><div style="font-size:48px;margin-bottom:14px">📭</div><p style="font-weight:700;font-size:15px;color:#475569">Nenhum pedido acompanhado</p><p style="font-size:13px;color:#1e3a5f;margin-top:6px">Insira o número do seu pedido acima.</p></div>';
+    return;
+  }
+  // ── Separar por prioridade ──
+  var excluidos=cliNums.filter(function(n){return pedidos[n]&&pedidos[n].status==="excluido";});
+  var prontos  =cliNums.filter(function(n){return pedidos[n]&&pedidos[n].status==="pronto";});
+  var entregues=cliNums.filter(function(n){return pedidos[n]&&pedidos[n].status==="entregue";});
+  var ativos   =cliNums.filter(function(n){return pedidos[n]&&pedidos[n].status!=="pronto"&&pedidos[n].status!=="entregue"&&pedidos[n].status!=="excluido";});
+  var semDados =cliNums.filter(function(n){return !pedidos[n];});
+  var h="";
+
+  // ── 1. EXCLUÍDOS primeiro (prioridade visual no topo) ──
+  if(excluidos.length){
+    h+='<p style="font-size:10px;font-weight:700;color:#f87171;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">⚠️ Atenção — Pedido Removido</p>';
+    excluidos.forEach(function(n){
+      var p=pedidos[n];
+      h+='<div class="anim-slideIn" style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.3);border-left:3px solid #ef4444;border-radius:14px;padding:16px;margin-bottom:10px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+        +'<span style="font-family:\'DM Mono\',monospace;font-weight:900;font-size:18px;color:#fff;letter-spacing:2px">#'+n+'</span>'
+        +'<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171">❌ Excluído</span>'
+        +'</div>'
+        +'<div style="background:rgba(239,68,68,.1);border-radius:9px;padding:12px;margin-bottom:10px">'
+        +'<p style="color:#fca5a5;font-size:13px;font-weight:600;line-height:1.5">⚠️ '+(p&&p.msgExclusao?p.msgExclusao:"Pedido removido. Informe o número correto e envie novamente.")+'</p>'
+        +'</div>'
+        +'<button onclick="cliRemovePedido(\''+n+'\')" style="width:100%;padding:9px;border-radius:9px;border:1px solid rgba(239,68,68,.3);background:transparent;color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:\'Inter\',sans-serif">Remover da lista</button>'
+        +'</div>';
+    });
+    h+='<div style="height:14px"></div>';
+  }
+
+  // ── 2. PRONTOS ──
+  if(prontos.length){
+    h+='<div class="pulse-glow" style="background:rgba(16,185,129,.09);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:14px 18px;margin-bottom:18px"><p style="color:#10b981;font-weight:800;font-size:14px;margin-bottom:3px">🎉 '+prontos.length+' pedido'+(prontos.length>1?"s":"")+" pronto"+(prontos.length>1?"s":"")+'!</p><p style="color:#6ee7b7;font-size:13px">Dirija-se ao balcão para retirar.</p></div>';
+    h+='<p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">✅ Prontos para retirar</p>';
+    prontos.forEach(function(n){h+=cliCard(n);});
+    h+='<div style="height:14px"></div>';
+  }
+
+  // ── 3. EM ANDAMENTO ──
+  if(ativos.length){
+    if(prontos.length||excluidos.length) h+='<p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">🔄 Em andamento</p>';
+    ativos.forEach(function(n){h+=cliCard(n);});
+    h+='<div style="height:14px"></div>';
+  }
+
+  // ── 4. ENTREGUES ──
+  if(entregues.length){
+    h+='<p style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">🎁 Entregues</p>';
+    entregues.forEach(function(n){h+=cliCard(n);});
+    h+='<div style="height:14px"></div>';
+  }
+
+  // ── 5. SEM DADOS ──
+  if(semDados.length){
+    semDados.forEach(function(n){
+      h+='<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-family:\'DM Mono\',monospace;font-weight:800;font-size:16px;color:#fff">#'+n+'</span><span style="color:#334155;font-size:12px">Aguardando...</span><button onclick="cliRemovePedido(\''+n+'\')" style="background:none;border:none;color:#334155;font-size:12px;cursor:pointer;font-family:\'Inter\',sans-serif">✕</button></div>';
+    });
+  }
+  wrap.innerHTML=h;
+}
+
+function cliCard(num){
+  var p=pedidos[num]; if(!p) return "";
+  var s=STATUS[p.status];
+  var steps=ORDEM.map(function(key,i){
+    var st=STATUS[key];var ativo=st.step<=s.step;var atual=st.step===s.step;
+    var line=i<ORDEM.length-1?'<div class="prog-line" style="flex:1;height:2px;background:'+(STATUS[key].step<s.step?st.color:'rgba(255,255,255,.06)')+'"></div>':"";
+    return '<div style="display:flex;align-items:center;'+(i<ORDEM.length-1?'flex:1':'')+'"><div class="prog-step" style="background:'+(ativo?st.color:'rgba(255,255,255,.05)')+';border-color:'+(ativo?st.color:'rgba(255,255,255,.08)')+';box-shadow:'+(atual?'0 0 14px '+st.color+'60':'none')+'">'+(ativo?st.icon:'')+'</div>'+line+'</div>';
+  }).join("");
+  var prontoMsg  =p.status==="pronto"  ?'<div style="margin-top:12px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:12px;color:#6ee7b7;font-weight:700;font-size:13px;text-align:center">🎉 Pronto! Vá ao balcão retirar.</div>':"";
+  var entregueMsg=p.status==="entregue"?'<div style="margin-top:12px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:10px;padding:12px;color:#c4b5fd;font-weight:700;font-size:13px;text-align:center">🎁 Pedido entregue! Obrigado.</div>':"";
+  return '<div class="anim-slideIn" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:3px solid '+s.color+';border-radius:14px;padding:16px;margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px"><span style="font-family:\'DM Mono\',monospace;font-weight:900;font-size:20px;color:#fff;letter-spacing:2px">#'+p.numero+'</span><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;background:'+s.color+'18;border:1px solid '+s.color+'40;color:'+s.color+'">'+s.icon+' '+s.label+'</span><button onclick="cliRemovePedido(\''+num+'\')" style="background:none;border:none;color:#334155;cursor:pointer;font-size:14px;line-height:1">✕</button></div></div><div style="display:flex;align-items:center">'+steps+'</div><div style="color:#1e3a5f;font-size:10px;margin-top:8px;font-family:\'DM Mono\',monospace">Atualizado: '+fmtDate(p.updatedAt)+'</div>'+prontoMsg+entregueMsg+'</div>';
+}
+
+// ── OP LOGIN ──────────────────────────────────────────────
+function opLogin(){
+  if(document.getElementById("inp-op-senha").value===SENHA_OP){
+    document.getElementById("inp-op-senha").value="";
+    document.getElementById("op-senha-err").style.display="none";
+    stopAllListeners();
+    startOpListeners();
+    startAutomacao();
+    goScreen("screen-operador");
+  } else {
+    document.getElementById("op-senha-err").style.display="block";
+    var inp=document.getElementById("inp-op-senha");
+    inp.classList.add("inp-error"); inp.value="";
+    setTimeout(function(){inp.classList.remove("inp-error");},500);
+  }
+}
+function opLogout(){ stopAllListeners(); goScreen("screen-cli-auth"); }
+
+// ── OP LISTENERS ──────────────────────────────────────────
+function startOpListeners(){
+  var refPed=DB.ref("pedidos");
+  refPed.on("value",function(snap){
+    pedidos=snap.val()||{};
+    renderBoard();
+    if(opTab==="relatorio") renderRelatorio();
+    if(opTab==="dashboard") renderDashboard();
+  });
+  var refCli=DB.ref("clientes");
+  refCli.on("value",function(snap){
+    clientes=snap.val()||{};
+    updateOpSummary();
+    if(opTab==="clientes") renderClientes();
+  });
+  var refLogs=DB.ref("logs");
+  refLogs.on("value",function(snap){
+    var val=snap.val();
+    logs = val||{};
+    // Sempre renderiza se estiver na aba, independente do estado anterior
+    if(opTab==="logs") renderLogs();
+  });
+  opListeners.push(refPed,refCli,refLogs);
+}
+
+// ── OP TABS ───────────────────────────────────────────────
+var OP_TITLES={
+  kanban:    ["Kanban","Arraste os cards para mudar o status · 🔴 tempo real"],
+  dashboard: ["Dashboard Executivo","Indicadores de performance em tempo real"],
+  relatorio: ["Relatório de Pedidos","Histórico completo sincronizado"],
+  clientes:  ["Gestão de Parceiros","Cadastro, edição e exclusão de parceiros"],
+  logs:      ["Registro de Alterações","Histórico de ações do operador"],
+};
+function switchOpTab(tab){
+  opTab=tab;
+  ["kanban","dashboard","relatorio","clientes","logs"].forEach(function(t){
+    var aba=document.getElementById("aba-"+t);
+    if(aba) aba.style.display=t===tab?(t==="kanban"?"flex":"block"):"none";
+    if(t==="kanban"&&t===tab) aba.style.flexDirection="column";
+    var nav=document.getElementById("nav-"+t);
+    if(nav){nav.classList.toggle("active",t===tab);nav.style.color=t===tab?"#10b981":"#64748b";}
+  });
+  var info=OP_TITLES[tab]||[tab,""];
+  document.getElementById("op-page-title").textContent=info[0];
+  document.getElementById("op-page-sub").textContent=info[1];
+  if(tab==="dashboard") renderDashboard();
+  if(tab==="relatorio") renderRelatorio();
+  if(tab==="clientes")  renderClientes();
+  if(tab==="logs"){
+    // Força leitura direta do Firebase ao abrir a aba
+    DB.ref("logs").once("value",function(snap){
+      logs = snap.val()||{};
+      renderLogs();
+    });
+  }
+}
+
+// ── KANBAN ────────────────────────────────────────────────
+function renderBoard(){
+  updateOpSummary();
+  ORDEM.forEach(function(status){
+    var body=document.getElementById("body-"+status);
+    var cnt=document.getElementById("cnt-"+status);
+    if(!body||!cnt) return;
+    var cards=Object.values(pedidos).filter(function(p){return p.status===status;}).sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+    cnt.textContent=cards.length;
+    body.innerHTML=cards.length?cards.map(function(p){return kCard(p);}).join(""):'<div style="text-align:center;padding:18px 8px;font-size:11px;color:#1e3a5f;border:1.5px dashed rgba(255,255,255,.05);border-radius:10px">Nenhum pedido</div>';
+  });
+}
+
+function updateOpSummary(){
+  var t=Object.keys(pedidos).length,tc=Object.keys(clientes).length;
+  var el=document.getElementById("op-summary-side");
+  if(el) el.textContent=t+" pedidos · "+tc+" parceiros";
+}
+
+function kCard(p){
+  var c=p.clienteId?clientes[p.clienteId]:null;
+  var nome=(c&&c.nome)||p.nomeAvulso||"—";
+  var tel=(c&&c.tel)||"";
+  var s=STATUS[p.status];
+  var wa=(tel&&p.status==="pronto")?'<a href="'+whatsLink(tel,p.numero,nome)+'" target="_blank" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 9px;border-radius:7px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.25);color:#25d366;text-decoration:none;margin-top:7px">💬 Notificar</a>':"";
+
+  // ── Automação 48h/72h para coluna Pronto ──
+  var alertaHtml="";
+  var borderColor=s.color+"80";
+  var cardBg="#0a1628";
+
+  if(p.status==="pronto" && p.etapas && p.etapas.pronto){
+    var horasEmPronto = (new Date()-new Date(p.etapas.pronto))/3600000;
+
+    if(horasEmPronto >= 72){
+      // 72h+ → alerta vermelho forte
+      borderColor="#ef4444";
+      cardBg="rgba(239,68,68,.08)";
+      alertaHtml='<div style="margin-top:8px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:8px 10px">'
+        +'<p style="color:#fca5a5;font-size:11px;font-weight:700;line-height:1.4">🚨 Prazo final de retirada excedido</p>'
+        +'<p style="color:#f87171;font-size:10px;margin-top:2px">'+Math.floor(horasEmPronto)+'h em espera</p>'
+        +'</div>';
+    } else if(horasEmPronto >= 48){
+      // 48h+ → alerta vermelho suave
+      borderColor="#f97316";
+      cardBg="rgba(249,115,22,.06)";
+      alertaHtml='<div style="margin-top:8px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.35);border-radius:8px;padding:8px 10px">'
+        +'<p style="color:#fdba74;font-size:11px;font-weight:700;line-height:1.4">⚠️ Pedido aguardando retirada há 48 horas</p>'
+        +'<p style="color:#fb923c;font-size:10px;margin-top:2px">'+Math.floor(horasEmPronto)+'h em espera</p>'
+        +'</div>';
+    }
+  }
+
+  return '<div class="k-card anim-slideIn" draggable="true" id="kc-'+p.numero+'"'
+    +' ondragstart="onDragStart(event,\''+p.numero+'\')" ondragend="onDragEnd(event)"'
+    +' style="background:'+cardBg+';border:1px solid rgba(255,255,255,.07);border-left:3px solid '+borderColor+';border-radius:12px;padding:11px">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:5px">'
+    +'<span style="font-family:\'DM Mono\',monospace;font-weight:900;font-size:17px;color:#fff;letter-spacing:2px">#'+p.numero+'</span>'
+    +'<button onclick="confirmDelPed(\''+p.numero+'\')" style="background:none;border:none;color:#334155;font-size:12px;cursor:pointer;line-height:1;padding:2px;font-family:\'Inter\',sans-serif;font-weight:700" title="Excluir pedido">🗑 Excluir</button>'
+    +'</div>'
+    +'<div style="font-size:12px;font-weight:600;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px">'+nome+(c?'<span style="color:#1e3a5f;font-size:10px"> ✓</span>':'')+'</div>'
+    +'<div style="font-size:10px;color:#334155;font-family:\'DM Mono\',monospace">'+fmtDate(p.createdAt)+'</div>'
+    +alertaHtml+wa
+    +'</div>';
+}
+
+// DnD
+function onDragStart(e,num){dragNum=num;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",num);setTimeout(function(){var el=document.getElementById("kc-"+num);if(el)el.classList.add("dragging");},0);}
+function onDragEnd(){document.querySelectorAll(".k-card").forEach(function(c){c.classList.remove("dragging");});document.querySelectorAll(".k-col-body").forEach(function(b){b.classList.remove("drag-over");});}
+function onDragOver(e,status){e.preventDefault();e.dataTransfer.dropEffect="move";var el=document.getElementById("body-"+status);if(el)el.classList.add("drag-over");}
+function onDragLeave(e){if(!e.currentTarget.contains(e.relatedTarget))e.currentTarget.classList.remove("drag-over");}
+function onDrop(e,targetStatus){
+  e.preventDefault();
+  document.querySelectorAll(".k-col-body").forEach(function(b){b.classList.remove("drag-over");});
+  var num=dragNum||e.dataTransfer.getData("text/plain");
+  if(!num||!pedidos[num]){dragNum=null;return;}
+  if(pedidos[num].status===targetStatus){dragNum=null;return;}
+  var upd={status:targetStatus,updatedAt:new Date().toISOString()};
+  upd["etapas/"+targetStatus]=new Date().toISOString();
+  DB.ref("pedidos/"+num).update(upd);
+  toast("#"+num+" → "+STATUS[targetStatus].label);
+  dragNum=null;
+}
+
+// Mobile tap
+document.addEventListener("click",function(e){
+  var card=e.target.closest(".k-card");
+  if(!card||e.target.closest("button")||e.target.closest("a")) return;
+  if(window.matchMedia("(pointer:coarse)").matches){
+    var num=card.id.replace("kc-","");
+    var p=pedidos[num]; if(!p) return;
+    var idx=ORDEM.indexOf(p.status);
+    if(idx>=ORDEM.length-1){toast("Pedido #"+num+" já entregue");return;}
+    var ns=ORDEM[idx+1];
+    var upd={status:ns,updatedAt:new Date().toISOString()};
+    upd["etapas/"+ns]=new Date().toISOString();
+    DB.ref("pedidos/"+num).update(upd);
+    toast("#"+num+" → "+STATUS[ns].label);
+  }
+});
+
+// ── EXCLUIR PEDIDO ────────────────────────────────────────
+function confirmDelPed(num){
+  document.getElementById("del-ped-num").textContent=num;
+  document.getElementById("del-ped-btn").onclick=function(){ deletarPedido(num); };
+  showModal("modal-del-ped");
+}
+
+function deletarPedido(num){
+  var p=pedidos[num];
+  var c=p&&p.clienteId?clientes[p.clienteId]:null;
+  // Em vez de remover, muda status para "excluido" para o parceiro ver a mensagem
+  DB.ref("pedidos/"+num).update({
+    status:"excluido",
+    updatedAt:new Date().toISOString(),
+    msgExclusao:"Pedido removido. Informe o número correto e envie novamente."
+  });
+  closeModal("modal-del-ped");
+  toast("Pedido #"+num+" excluído","warn");
+  registrarLog("Exclusão de pedido","Pedido #"+num+(c?" | Cliente: "+c.nome:""));
+  // Remove definitivamente após 30 segundos (tempo para parceiro ver a mensagem)
+  setTimeout(function(){ DB.ref("pedidos/"+num).remove(); }, 30000);
+}
+
+// ── FORM PANEL (operador cria pedido) ─────────────────────
+function openFP(){document.getElementById("form-panel").classList.add("open");document.getElementById("fp-overlay").classList.add("open");setTimeout(function(){document.getElementById("fp-num").focus();},300);}
+function closeFP(){document.getElementById("form-panel").classList.remove("open");document.getElementById("fp-overlay").classList.remove("open");}
+
+function buscarCliForm(q){
+  var list=document.getElementById("autocomplete-list");
+  if(q.length<2){list.style.display="none";list.classList.remove("open");return;}
+  var qL=q.toLowerCase();
+  var m=Object.values(clientes).filter(function(c){return c.nome.toLowerCase().indexOf(qL)>=0||c.login.toLowerCase().indexOf(qL)>=0;}).slice(0,5);
+  if(!m.length){list.style.display="none";list.classList.remove("open");return;}
+  list.innerHTML=m.map(function(c){return '<div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04)" onmouseover="this.style.background=\'rgba(255,255,255,.06)\'" onmouseout="this.style.background=\'transparent\'" onclick="selCliForm(\''+c.id+'\')"><div style="font-weight:700;font-size:13px;color:#fff">'+c.nome+'</div><div style="font-size:11px;color:#64748b;font-family:\'DM Mono\',monospace">'+c.login+'</div></div>';}).join("");
+  list.style.display="block"; list.classList.add("open");
+}
+
+function selCliForm(id){
+  var c=clientes[id];if(!c) return; cliFormId=id;
+  document.getElementById("fp-sel-nome").textContent=c.nome;
+  document.getElementById("fp-sel-login").textContent=c.login;
+  document.getElementById("fp-sel-wrap").style.display="block";
+  document.getElementById("fp-ac-wrap").style.display="none";
+  document.getElementById("fp-avulso-wrap").style.display="none";
+  document.getElementById("autocomplete-list").style.display="none";
+  document.getElementById("fp-busca").value="";
+}
+
+function limparCliForm(){
+  cliFormId=null;
+  document.getElementById("fp-sel-wrap").style.display="none";
+  document.getElementById("fp-ac-wrap").style.display="block";
+  document.getElementById("fp-avulso-wrap").style.display="block";
+}
+
+function criarPedidoOp(){
+  var num=(document.getElementById("fp-num").value||"").trim().replace(/\D/g,"");
+  var avulso=document.getElementById("fp-avulso").value.trim();
+  var obs=document.getElementById("fp-obs").value.trim();
+  if(!num||num.length!==7){toast("O número do pedido deve ter 7 dígitos.","err");return;}
+  if(pedidos[num]){toast("Pedido já existe!","err");return;}
+  if(!cliFormId&&!avulso){toast("Informe o nome ou vincule um parceiro","err");return;}
+  var novoPed={numero:num,clienteId:cliFormId||null,nomeAvulso:avulso||null,obs:obs||null,status:"criado",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),etapas:{criado:new Date().toISOString()},criadoPorOperador:true};
+  DB.ref("pedidos/"+num).set(novoPed);
+  document.getElementById("fp-num").value="";
+  document.getElementById("fp-avulso").value="";
+  document.getElementById("fp-obs").value="";
+  limparCliForm(); closeFP();
+  toast("✓ Pedido #"+num+" criado pelo operador");
+  registrarLog("Criação manual de pedido","Pedido #"+num+(avulso?" | Cliente: "+avulso:"")+(obs?" | Obs: "+obs:""));
+}
+
+// ── AUTOMAÇÃO 48h/72h ─────────────────────────────────────
+var alertas48hEnviados = {}; // controle para não enviar duplicado
+
+function verificarPrazosPronto(){
+  Object.values(pedidos).forEach(function(p){
+    if(p.status!=="pronto") return;
+    if(!p.etapas||!p.etapas.pronto) return;
+    var horasEmPronto=(new Date()-new Date(p.etapas.pronto))/3600000;
+    // Ao completar 48h → envia aviso ao parceiro UMA VEZ
+    if(horasEmPronto>=48 && !alertas48hEnviados[p.numero]){
+      alertas48hEnviados[p.numero]=true;
+      // Grava notificação no Firebase para o parceiro ver
+      if(p.clienteId){
+        var chave="alerta48_"+p.numero;
+        DB.ref("alertas/"+p.clienteId+"/"+chave).once("value",function(snap){
+          if(!snap.exists()){
+            DB.ref("alertas/"+p.clienteId+"/"+chave).set({
+              pedido:p.numero,
+              msg:"⚠️ Pedido #"+p.numero+" será cancelado em 24 horas caso não faça a retirada.",
+              tipo:"aviso48h",
+              data:new Date().toISOString(),
+              lido:false
+            });
+          }
+        });
+      }
+    }
+  });
+  // Reatualiza o board para refletir cores atualizadas
+  renderBoard();
+}
+
+// Inicia verificação a cada 5 minutos
+function startAutomacao(){
+  verificarPrazosPronto();
+  setInterval(verificarPrazosPronto, 5*60*1000);
+}
+
+// ── ALERTAS NO CLIENTE ────────────────────────────────────
+function startAlertasCliente(){
+  if(!cliLogado) return;
+  var refAlertas=DB.ref("alertas/"+cliLogado.id);
+  refAlertas.on("value",function(snap){
+    var todos=snap.val()||{};
+    var naoLidos=Object.entries(todos).filter(function(e){return !e[1].lido;});
+    renderAlertasCliente(naoLidos,todos);
+  });
+  opListeners.push(refAlertas);
+}
+
+function renderAlertasCliente(naoLidos,todos){
+  // Remove banner antigo se existir
+  var old=document.getElementById("cli-alertas-banner");
+  if(old) old.remove();
+  if(!naoLidos.length) return;
+  var wrap=document.getElementById("cli-pedidos-wrap");
+  if(!wrap) return;
+  var banner=document.createElement("div");
+  banner.id="cli-alertas-banner";
+  banner.style.cssText="margin-bottom:16px";
+  var html='<p style="font-size:10px;font-weight:700;color:#f87171;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">🔔 Aviso Importante</p>';
+  naoLidos.forEach(function(entry){
+    var key=entry[0]; var alerta=entry[1];
+    html+='<div style="background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.35);border-left:3px solid #ef4444;border-radius:12px;padding:14px 16px;margin-bottom:8px">'
+      +'<p style="color:#fca5a5;font-size:13px;font-weight:700;line-height:1.5;margin-bottom:10px">'+alerta.msg+'</p>'
+      +'<button onclick="marcarAlertaLido(\''+key+'\')" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.3);background:transparent;color:#f87171;font-size:11px;font-weight:700;cursor:pointer;font-family:\'Inter\',sans-serif">✓ Entendi</button>'
+      +'</div>';
+  });
+  banner.innerHTML=html;
+  wrap.insertBefore(banner,wrap.firstChild);
+}
+
+function marcarAlertaLido(key){
+  if(!cliLogado) return;
+  DB.ref("alertas/"+cliLogado.id+"/"+key+"/lido").set(true);
+}
+function renderClientes(filtro){
+  var lista=Object.values(clientes).sort(function(a,b){return a.nome.localeCompare(b.nome);});
+  if(filtro){
+    var f=filtro.toLowerCase();
+    lista=lista.filter(function(c){return c.nome.toLowerCase().indexOf(f)>=0||c.login.toLowerCase().indexOf(f)>=0;});
+  }
+  clisFiltrados=lista;
+  var wrap=document.getElementById("lista-parceiros");
+  if(!lista.length){wrap.innerHTML='<div style="text-align:center;padding:48px;color:#1e3a5f;font-size:14px">Nenhum parceiro encontrado.</div>';return;}
+  wrap.innerHTML=lista.map(function(c){
+    var qtd=Object.values(pedidos).filter(function(p){return p.clienteId===c.id;}).length;
+    return '<div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:14px 16px">'
+      +'<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#10b981,#3b82f6);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff;flex-shrink:0">'+c.nome.charAt(0).toUpperCase()+'</div>'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-weight:700;font-size:14px;color:#fff">'+c.nome+'</div>'
+        +'<div style="font-size:11px;color:#475569;font-family:\'DM Mono\',monospace">@'+c.login+(c.tel?' · '+c.tel:'')+'</div>'
+        +'<div style="font-size:10px;color:#1e3a5f;margin-top:2px">'+qtd+' pedido'+(qtd!==1?"s":"")+" · desde "+fmtDateSh(c.criadoEm)+'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-shrink:0">'
+        +'<button class="btn-amber" onclick="abrirEditCli(\''+c.id+'\')">✏️ Editar</button>'
+        +'<button class="btn-red" onclick="confirmDelCli(\''+c.id+'\',\''+c.nome.replace(/'/g,"\\'")+'\')" >🗑 Excluir</button>'
+      +'</div>'
+      +'</div>';
+  }).join("");
+}
+
+function filtrarClientes(q){ renderClientes(q); }
+
+function abrirEditCli(id){
+  var c=clientes[id]; if(!c) return;
+  editCliId=id;
+  document.getElementById("edit-cli-nome").value=c.nome;
+  document.getElementById("edit-cli-login").value=c.login;
+  document.getElementById("edit-cli-senha").value="";
+  document.getElementById("edit-cli-err").style.display="none";
+  document.getElementById("edit-cli-ok").style.display="none";
+  showModal("modal-edit-cli");
+}
+
+function salvarEdicaoCli(){
+  var nome=(document.getElementById("edit-cli-nome").value||"").trim();
+  var login=(document.getElementById("edit-cli-login").value||"").trim().toLowerCase();
+  var senha=(document.getElementById("edit-cli-senha").value||"").trim();
+  var errEl=document.getElementById("edit-cli-err");
+  var okEl=document.getElementById("edit-cli-ok");
+  errEl.style.display="none"; okEl.style.display="none";
+  if(!nome){errEl.textContent="Digite o nome.";errEl.style.display="block";return;}
+  if(!login){errEl.textContent="Digite o login.";errEl.style.display="block";return;}
+  var cAtual=clientes[editCliId];
+  // Verifica duplicidade de login (exceto o próprio)
+  var dup=Object.values(clientes).find(function(c){return c.login===login&&c.id!==editCliId;});
+  if(dup){errEl.textContent="Este login já está em uso. Escolha outro.";errEl.style.display="block";return;}
+  if(senha&&(senha.length!==4||isNaN(Number(senha)))){errEl.textContent="Senha deve ter exatamente 4 dígitos.";errEl.style.display="block";return;}
+  var upd={nome:nome,login:login};
+  if(senha) upd.senha=hashPin(senha);
+  DB.ref("clientes/"+editCliId).update(upd,function(err){
+    if(err){errEl.textContent="Erro ao salvar. Tente novamente.";errEl.style.display="block";return;}
+    okEl.textContent="Cadastro atualizado com sucesso."; okEl.style.display="block";
+    var acoes=[];
+    if(cAtual.nome!==nome) acoes.push("nome: "+cAtual.nome+"→"+nome);
+    if(cAtual.login!==login) acoes.push("login: "+cAtual.login+"→"+login);
+    if(senha) acoes.push("senha redefinida");
+    registrarLog("Edição de parceiro","Cliente: "+nome+" | "+acoes.join(", "));
+    setTimeout(function(){closeModal("modal-edit-cli");},2000);
+  });
+}
+
+function confirmDelCli(id,nome){
+  document.getElementById("del-cli-nome").textContent=nome;
+  document.getElementById("del-cli-btn").onclick=function(){ deletarCliente(id,nome); };
+  showModal("modal-del-cli");
+}
+
+function deletarCliente(id,nome){
+  DB.ref("clientes/"+id).remove();
+  closeModal("modal-del-cli");
+  toast("Parceiro excluído com sucesso.","warn");
+  registrarLog("Exclusão de parceiro","Cliente: "+nome);
+}
+
+// ── RELATÓRIO ─────────────────────────────────────────────
+function renderRelatorio(){
+  var tbody=document.getElementById("tabela-pedidos");
+  var lista=Object.values(pedidos).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+  if(!lista.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:32px;color:#334155">Nenhum pedido registrado.</td></tr>';return;}
+  var badge={
+    criado:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">📋 Criado</span>',
+    separacao:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(59,130,246,.12);color:#3b82f6;border:1px solid rgba(59,130,246,.3)">📦 Separação</span>',
+    pronto:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.3)">✅ Pronto</span>',
+    entregue:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)">🎁 Entregue</span>'
+  };
+  tbody.innerHTML=lista.map(function(p){
+    var c=p.clienteId?clientes[p.clienteId]:null;
+    var nome=(c&&c.nome)||p.nomeAvulso||"—";
+    return '<tr><td style="font-family:\'DM Mono\',monospace;font-weight:900;color:#fff;font-size:14px">#'+p.numero+'</td><td style="color:#cbd5e1;font-size:13px">'+nome+'</td><td>'+(badge[p.status]||p.status)+'</td><td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace">'+fmtDate(p.createdAt)+'</td><td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace">'+fmtDate(p.updatedAt)+'</td><td style="text-align:right;font-weight:700;font-size:12px;color:'+(p.status==='entregue'?'#10b981':'#475569')+'">'+tempoTotal(p)+'</td></tr>';
+  }).join("");
+}
+
+// ── LOGS ──────────────────────────────────────────────────
+function renderLogs(){
+  var tbody=document.getElementById("tabela-logs");
+  if(!tbody) return;
+
+  // Aceita TODOS os registros independente da estrutura
+  var lista=Object.values(logs).filter(function(l){ return l && typeof l === "object"; });
+
+  // Ordena — logs sem campo data ficam no final
+  lista.sort(function(a,b){
+    var da = a.data ? new Date(a.data) : new Date(0);
+    var db = b.data ? new Date(b.data) : new Date(0);
+    return db - da;
+  });
+
+  if(!lista.length){
+    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:32px;color:#334155">Nenhuma alteração registrada.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML=lista.map(function(l){
+    var acao     = l.acao     || l.action  || l.tipo   || "—";
+    var detalhes = l.detalhes || l.details || l.info   || "—";
+    var dataFmt  = l.dataFmt  || (l.data ? fmtDate(l.data) : "—");
+    var operador = l.operador || l.operator|| l.user   || "Operador";
+    var corAcao  = acao.indexOf("Exclus")>=0 || acao.indexOf("exclus")>=0 ? "#f87171"
+                 : acao.indexOf("senha")>=0  || acao.indexOf("Senha")>=0  ? "#f59e0b"
+                 : "#10b981";
+    return '<tr>'
+      +'<td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace;white-space:nowrap">'+dataFmt+'</td>'
+      +'<td style="color:#94a3b8;font-size:12px;font-weight:600">'+operador+'</td>'
+      +'<td style="font-size:12px;font-weight:700;color:'+corAcao+'">'+acao+'</td>'
+      +'<td style="color:#64748b;font-size:12px">'+detalhes+'</td>'
+      +'</tr>';
+  }).join("");
+}
+
+// ── EXCEL ─────────────────────────────────────────────────
+function exportExcel(){
+  var lista=Object.values(pedidos).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+  var rows=lista.map(function(p){
+    var c=p.clienteId?clientes[p.clienteId]:null;
+    var e=p.etapas||{};
+    return {"Nº Pedido":p.numero,"Parceiro":(c&&c.nome)||p.nomeAvulso||"—","Login":(c&&c.login)||"—","Status":(STATUS[p.status]&&STATUS[p.status].label)||p.status,"Criação":fmtDate(p.createdAt),"Atualização":fmtDate(p.updatedAt),"Hora Criado":e.criado?fmtDate(e.criado):"—","Hora Separação":e.separacao?fmtDate(e.separacao):"—","Hora Pronto":e.pronto?fmtDate(e.pronto):"—","Hora Entregue":e.entregue?fmtDate(e.entregue):"—","T.Criado→Sep":e.criado&&e.separacao?minDiff(e.criado,e.separacao)+" min":"—","T.Sep→Pronto":e.separacao&&e.pronto?minDiff(e.separacao,e.pronto)+" min":"—","T.Pronto→Ent":e.pronto&&e.entregue?minDiff(e.pronto,e.entregue)+" min":"—","Tempo Total":tempoTotal(p)};
+  });
+  var ws=XLSX.utils.json_to_sheet(rows);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,"Pedidos",ws);
+  var dias={};
+  lista.forEach(function(p){var d=fmtDateSh(p.createdAt);dias[d]=(dias[d]||0)+1;});
+  var ws2=XLSX.utils.json_to_sheet(Object.entries(dias).map(function(e){return{"Data":e[0],"Qtd":e[1]};}));
+  XLSX.utils.book_append_sheet(wb,"Resumo por Dia",ws2);
+  XLSX.writeFile(wb,"logistica-"+fmtDateSh(new Date()).replace(/\//g,"-")+".xlsx");
+  toast("✓ Excel exportado!");
+}
+
+// ── BACKUP ────────────────────────────────────────────────
+function backupJSON(){
+  var backup={exportadoEm:new Date().toLocaleString("pt-BR"),pedidos:pedidos,parceiros:Object.values(clientes).map(function(c){return{id:c.id,login:c.login,nome:c.nome,tel:c.tel||"",criadoEm:c.criadoEm};}),totalPedidos:Object.keys(pedidos).length,totalClientes:Object.keys(clientes).length};
+  var blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json;charset=utf-8;"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="backup-logistica-"+fmtDateSh(new Date()).replace(/\//g,"-")+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("✓ Backup salvo!");
+}
+
+// ── URL DO SISTEMA ────────────────────────────────────────
+// Usa a URL do Netlify publicado. Se estiver em file:/// usa fallback.
+var NETLIFY_URL = "https://logistica-materiais.vercel.app";
+function getSysURL(){
+  var u = window.location.href.split("?")[0];
+  if(u.indexOf("file:///")>=0 || u.indexOf("localhost")>=0 || u.indexOf("127.0.0.1")>=0){
+    return NETLIFY_URL;
+  }
+  return u;
+}
+
+// ── QR ────────────────────────────────────────────────────
+function gerarQRCanvas(canvas, texto, size){
+  try{
+    canvas.width  = size;
+    canvas.height = size;
+    var div = document.createElement("div");
+    new QRCode(div,{text:texto, width:size, height:size, colorDark:"#10b981", colorLight:"#050e1a", correctLevel:QRCode.CorrectLevel.M});
+    setTimeout(function(){
+      var img = div.querySelector("img") || div.querySelector("canvas");
+      if(!img) return;
+      var ctx = canvas.getContext("2d");
+      ctx.clearRect(0,0,size,size);
+      ctx.drawImage(img, 0, 0, size, size);
+    }, 150);
+  }catch(e){
+    // fallback API externa
+    var img2 = new Image();
+    img2.crossOrigin = "anonymous";
+    img2.onload = function(){ canvas.getContext("2d").drawImage(img2,0,0,size,size); };
+    img2.src = "https://api.qrserver.com/v1/create-qr-code/?size="+size+"x"+size+"&data="+encodeURIComponent(texto)+"&bgcolor=050e1a&color=10b981&margin=6";
+  }
+}
+
+function imprimirQR(){
+  var url    = getSysURL();
+  var qrSrc  = "https://api.qrserver.com/v1/create-qr-code/?size=320x320&data="+encodeURIComponent(url)+"&bgcolor=ffffff&color=000000&margin=20";
+  var win    = window.open("","_blank");
+  win.document.write('<!DOCTYPE html><html><head><title>QR Code — Logística de Materiais</title>'
+    +'<style>'
+    +'body{font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#fff;text-align:center;padding:24px}'
+    +'img{border:4px solid #10b981;border-radius:14px;margin:18px 0}'
+    +'h1{font-size:24px;color:#050e1a;margin-bottom:6px;font-weight:900}'
+    +'p{font-size:14px;color:#475569;margin:4px 0}'
+    +'.url{font-size:11px;color:#64748b;word-break:break-all;max-width:360px;margin:12px auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;background:#f8fafc;font-family:monospace}'
+    +'@media print{.no-print{display:none}}'
+    +'</style></head><body>'
+    +'<h1>📦 Logística de Materiais</h1>'
+    +'<p>Escaneie o QR Code para acompanhar seu pedido</p>'
+    +'<img src="'+qrSrc+'" width="320" height="320" alt="QR Code"/>'
+    +'<p style="color:#10b981;font-weight:700;font-size:14px">Acesse, crie sua conta e insira o número do pedido</p>'
+    +'<div class="url">'+url+'</div>'
+    +'<button class="no-print" onclick="window.print()" style="margin-top:20px;padding:13px 32px;border-radius:10px;border:none;background:#10b981;color:#fff;font-weight:700;font-size:15px;cursor:pointer">🖨️ Imprimir</button>'
+    +'</body></html>');
+  win.document.close();
+  setTimeout(function(){ win.print(); }, 1000);
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────
+function renderDashboard(){
+  var lista=Object.values(pedidos);
+  var hoje=fmtDateSh(new Date());
+  var mesAt=new Date().toLocaleString("pt-BR",{month:"2-digit",year:"numeric"});
+  var pedHoje=lista.filter(function(p){return fmtDateSh(p.createdAt)===hoje;});
+  var pedMes=lista.filter(function(p){return new Date(p.createdAt).toLocaleString("pt-BR",{month:"2-digit",year:"numeric"})===mesAt;});
+  var entregues=lista.filter(function(p){return p.status==="entregue"&&p.etapas&&p.etapas.entregue;});
+  var tempoMed=entregues.length?Math.round(entregues.reduce(function(acc,p){return acc+minDiff(p.createdAt,p.etapas.entregue);},0)/entregues.length):null;
+
+  // ── Calcular top 3 picos ──
+  var horas={};
+  lista.forEach(function(p){var h=new Date(p.createdAt).getHours();horas[h]=(horas[h]||0)+1;});
+  var horasOrdenadas=Object.entries(horas).sort(function(a,b){return b[1]-a[1];});
+  var top3=horasOrdenadas.slice(0,3);
+  var picoTxt=top3.length?top3[0][0].toString().padStart(2,"0")+"h":"—";
+
+  // ── KPIs ──
+  document.getElementById("kpi-hoje").textContent=pedHoje.length;
+  document.getElementById("kpi-mes").textContent=pedMes.length;
+  document.getElementById("kpi-tempo").textContent=tempoMed!=null?tempoMed+"min":"—";
+  document.getElementById("kpi-pico").textContent=picoTxt;
+
+  // ── Bloco picos detalhados ──
+  var picosHtml='';
+  var picoLabels=["🚨 Pico principal","⚡ 2º pico","📌 3º pico"];
+  var picoCores=["#f59e0b","#3b82f6","#8b5cf6"];
+  top3.forEach(function(item,i){
+    var h=parseInt(item[0]); var qtd=item[1];
+    var hFim=(h+1)%24;
+    picosHtml+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);margin-bottom:7px">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:12px;font-weight:700;color:'+picoCores[i]+'">'+picoLabels[i]+'</span>'
+      +'<span style="font-size:12px;color:#e2e8f0;font-family:\'DM Mono\',monospace">'+h.toString().padStart(2,"0")+'h às '+hFim.toString().padStart(2,"0")+'h</span>'
+      +'</div>'
+      +'<span style="font-size:13px;font-weight:800;color:'+picoCores[i]+'">'+qtd+' pedido'+(qtd!==1?"s":"")+'</span>'
+      +'</div>';
+  });
+
+  // Atualiza bloco de picos se existir
+  var picosEl=document.getElementById("dash-picos");
+  if(picosEl) picosEl.innerHTML=picosHtml||'<p style="color:#334155;font-size:12px">Sem dados suficientes.</p>';
+
+  // ── Tempos por etapa ──
+  function avg(arr){return arr.length?Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length):0;}
+  var tCS=entregues.map(function(p){return p.etapas&&p.etapas.separacao?minDiff(p.etapas.criado||p.createdAt,p.etapas.separacao):0;}).filter(Boolean);
+  var tSP=entregues.map(function(p){return p.etapas&&p.etapas.pronto&&p.etapas.separacao?minDiff(p.etapas.separacao,p.etapas.pronto):0;}).filter(Boolean);
+  var tPE=entregues.map(function(p){return p.etapas&&p.etapas.entregue&&p.etapas.pronto?minDiff(p.etapas.pronto,p.etapas.entregue):0;}).filter(Boolean);
+  var avgCS=avg(tCS), avgSP=avg(tSP), avgPE=avg(tPE);
+  var maxEtapa=Math.max(avgCS,avgSP,avgPE);
+
+  // ── Status percentuais ──
+  var total=lista.length||1;
+  var statusQtd=ORDEM.map(function(s){return lista.filter(function(p){return p.status===s;}).length;});
+
+  // Bloco status detalhado
+  var statusEl=document.getElementById("dash-status-detail");
+  if(statusEl){
+    statusEl.innerHTML=ORDEM.map(function(s,i){
+      var qtd=statusQtd[i]; var pct=total>0?Math.round(qtd/total*100):0;
+      var st=STATUS[s];
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">'+st.icon+'</span><span style="font-size:12px;color:#e2e8f0;font-weight:600">'+st.label+'</span></div>'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:12px;font-weight:700;color:'+st.color+'">'+qtd+' pedido'+(qtd!==1?"s":"")+'</span>'
+        +'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:'+st.color+'18;color:'+st.color+'">'+pct+'%</span>'
+        +'</div></div>';
+    }).join("");
+  }
+
+  // ── Alertas ──
+  var alertas=[];
+  if(top3.length>0){
+    var h0=parseInt(top3[0][0]);
+    alertas.push({icon:"🚨",txt:"Pico alto das "+h0.toString().padStart(2,"0")+"h às "+(h0+1).toString().padStart(2,"0")+"h",cor:"#f59e0b"});
+  }
+  var medSep=tempoMed?Math.round(tempoMed*0.4):null;
+  if(avgSP>0&&medSep&&avgSP>medSep){
+    alertas.push({icon:"⚠️",txt:"Separação acima do tempo médio ("+avgSP+" min)",cor:"#f87171"});
+  } else if(avgSP>0){
+    alertas.push({icon:"✅",txt:"Separação dentro do tempo normal ("+avgSP+" min)",cor:"#10b981"});
+  }
+  if(entregues.length>0){
+    alertas.push({icon:"✅",txt:"Entregas dentro do prazo esperado",cor:"#10b981"});
+  }
+  var alertasEl=document.getElementById("dash-alertas");
+  if(alertasEl){
+    alertasEl.innerHTML=alertas.map(function(a){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:9px;background:rgba(255,255,255,.03);margin-bottom:5px">'
+        +'<span>'+a.icon+'</span>'
+        +'<span style="font-size:12px;font-weight:600;color:'+a.cor+'">'+a.txt+'</span>'
+        +'</div>';
+    }).join("")||'<p style="color:#334155;font-size:12px">Sem alertas no momento.</p>';
+  }
+
+  // ── Sugestão de reforço ──
+  var reforcoEl=document.getElementById("dash-reforco");
+  if(reforcoEl&&horasOrdenadas.length){
+    var totalPed=lista.length||1;
+    var reforcoHtml=horasOrdenadas.slice(0,6).map(function(item){
+      var h=parseInt(item[0]); var qtd=item[1]; var pct=Math.round(qtd/totalPed*100);
+      var nivel,cor;
+      if(pct>=20){nivel="reforço recomendado 🔴";cor="#f87171";}
+      else if(pct>=10){nivel="fluxo normal 🟡";cor="#f59e0b";}
+      else{nivel="baixa demanda 🟢";cor="#10b981";}
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);margin-bottom:6px">'
+        +'<span style="font-size:12px;font-weight:700;color:#e2e8f0;font-family:\'DM Mono\',monospace">'+h.toString().padStart(2,"0")+'h às '+(h+1).toString().padStart(2,"0")+'h</span>'
+        +'<span style="font-size:11px;font-weight:600;color:'+cor+'">'+nivel+'</span>'
+        +'</div>';
+    }).join("");
+    reforcoEl.innerHTML=reforcoHtml||'<p style="color:#334155;font-size:12px">Sem dados suficientes.</p>';
+  }
+
+  // ── Gráfico Pedidos por Mês (ano atual) ──
+  var anoAtual = new Date().getFullYear();
+  var mesesNomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  var countMeses = mesesNomes.map(function(_,m){
+    return lista.filter(function(p){
+      var d = new Date(p.createdAt);
+      return d.getFullYear()===anoAtual && d.getMonth()===m;
+    }).length;
+  });
+  // Indicadores
+  var mesesComDados = countMeses.map(function(v,i){return{v:v,i:i};}).filter(function(x){return x.v>0;});
+  if(mesesComDados.length){
+    var melhor = mesesComDados.reduce(function(a,b){return b.v>a.v?b:a;});
+    var menor  = mesesComDados.reduce(function(a,b){return b.v<a.v?b:a;});
+    var media  = Math.round(countMeses.reduce(function(a,b){return a+b;},0)/mesesComDados.length);
+    var el1=document.getElementById("dash-mes-melhor");
+    var el2=document.getElementById("dash-mes-menor");
+    var el3=document.getElementById("dash-mes-media");
+    if(el1) el1.textContent="📈 Melhor mês: "+mesesNomes[melhor.i]+" — "+melhor.v+" pedidos";
+    if(el2) el2.textContent="📉 Menor mês: "+mesesNomes[menor.i]+" — "+menor.v+" pedidos";
+    if(el3) el3.textContent="📊 Média mensal: "+media+" pedidos";
+  }
+  // Gráfico de área
+  var ctxMeses=document.getElementById("chart-meses");
+  if(ctxMeses){
+    if(charts["chart-meses"]) charts["chart-meses"].destroy();
+    charts["chart-meses"]=new Chart(ctxMeses,{
+      type:"line",
+      data:{
+        labels:mesesNomes,
+        datasets:[{
+          label:"Pedidos",
+          data:countMeses,
+          fill:true,
+          backgroundColor:"rgba(139,92,246,.18)",
+          borderColor:"#8b5cf6",
+          borderWidth:2.5,
+          pointBackgroundColor:"#8b5cf6",
+          pointBorderColor:"#fff",
+          pointBorderWidth:2,
+          pointRadius:5,
+          pointHoverRadius:7,
+          tension:0.4
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:true,
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            titleColor:"#e2e8f0",
+            bodyColor:"#94a3b8",
+            callbacks:{
+              label:function(ctx){ return " "+ctx.raw+" pedidos"; }
+            }
+          },
+          datalabels:{display:false}
+        },
+        scales:{
+          x:{ticks:{color:"#475569",font:{size:11}},grid:{color:"rgba(255,255,255,.04)"}},
+          y:{ticks:{color:"#475569",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"},beginAtZero:true}
+        }
+      },
+      plugins:[{
+        id:"datalabelsCustom",
+        afterDatasetsDraw:function(chart){
+          var ctx2=chart.ctx;
+          chart.data.datasets.forEach(function(dataset,i){
+            var meta=chart.getDatasetMeta(i);
+            meta.data.forEach(function(point,j){
+              var val=dataset.data[j];
+              if(val>0){
+                ctx2.fillStyle="#c4b5fd";
+                ctx2.font="bold 11px Inter,sans-serif";
+                ctx2.textAlign="center";
+                ctx2.fillText(val, point.x, point.y-10);
+              }
+            });
+          });
+        }
+      }]
+    });
+  }
+
+  // ── Gráficos existentes ──
+  var dias14=[];for(var i=13;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);dias14.push(fmtDateSh(d));}
+  buildChart("chart-dias","bar",dias14.map(function(d){return d.slice(0,5);}),
+    [{label:"Pedidos",data:dias14.map(function(d){return lista.filter(function(p){return fmtDateSh(p.createdAt)===d;}).length;}),backgroundColor:"rgba(16,185,129,.5)",borderColor:"#10b981",borderWidth:2,borderRadius:6}]);
+  var h24=Array.from({length:24},function(_,i){return i;});
+  buildChart("chart-horas","bar",h24.map(function(h){return h.toString().padStart(2,"0")+"h";}),
+    [{label:"Pedidos",data:h24.map(function(h){return lista.filter(function(p){return new Date(p.createdAt).getHours()===h;}).length;}),backgroundColor:"rgba(59,130,246,.5)",borderColor:"#3b82f6",borderWidth:2,borderRadius:4}]);
+  buildChart("chart-status","doughnut",ORDEM.map(function(s){return STATUS[s].label+" ("+statusQtd[ORDEM.indexOf(s)]+")";}),
+    [{data:statusQtd,backgroundColor:["rgba(245,158,11,.7)","rgba(59,130,246,.7)","rgba(16,185,129,.7)","rgba(139,92,246,.7)"],borderWidth:0}],
+    {plugins:{legend:{position:"bottom",labels:{color:"#64748b",font:{size:11}}},tooltip:{callbacks:{label:function(ctx){var qtd=ctx.raw;var pct=total>0?Math.round(qtd/total*100):0;return " "+qtd+" pedidos ("+pct+"%)";}}}}});
+
+  // Gráfico etapas com destaque na mais lenta
+  var etapaLabels=["Criado→Separação","Separação→Pronto","Pronto→Entregue"];
+  var etapaVals=[avgCS,avgSP,avgPE];
+  var bgColors=etapaVals.map(function(v){return v===maxEtapa&&v>0?"rgba(239,68,68,.7)":"rgba(59,130,246,.6)";});
+  buildChart("chart-etapas","bar",etapaLabels,
+    [{label:"Minutos",data:etapaVals,backgroundColor:bgColors,borderRadius:8}],
+    {plugins:{tooltip:{callbacks:{label:function(ctx){var v=ctx.raw;var isSlowest=v===maxEtapa&&v>0;return " "+v+" min"+(isSlowest?" ⚠️ mais lenta":"");}}}},scales:{x:{ticks:{color:"#475569",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}},y:{ticks:{color:"#475569",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"},beginAtZero:true}}});
+}
+
+function buildChart(id,type,labels,datasets,extraOpts){
+  extraOpts=extraOpts||{};
+  var ctx=document.getElementById(id);if(!ctx) return;
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(ctx,{type:type,data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:true,plugins:Object.assign({legend:{labels:{color:"#64748b",font:{size:11}}},tooltip:{titleColor:"#e2e8f0",bodyColor:"#94a3b8"}},extraOpts.plugins||{}),scales:(type!=="doughnut"&&type!=="pie")?{x:{ticks:{color:"#475569",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"}},y:{ticks:{color:"#475569",font:{size:10}},grid:{color:"rgba(255,255,255,.04)"},beginAtZero:true}}:undefined}});
+}
+
+// Fechar autocomplete
+document.addEventListener("click",function(e){
+  if(!e.target.closest("#fp-ac-wrap")){
+    var l=document.getElementById("autocomplete-list");
+    l.style.display="none";l.classList.remove("open");
+  }
+});
+
+// ── INIT ──────────────────────────────────────────────────
+window.onload=function(){
+  document.getElementById("loading-screen").style.display="none";
+  // QR da tela inicial — usa URL válida do Netlify
+  setTimeout(function(){
+    var url = getSysURL();
+    var c = document.getElementById("qr-cli-canvas");
+    if(c) gerarQRCanvas(c, url, 130);
+  }, 400);
+  carregarLoginSalvo();
+  goScreen("screen-cli-auth");
+};
+</script>
+</body>
+</html>
