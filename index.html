@@ -790,14 +790,51 @@ function cliCadastrar(){
 
 function doLoginCli(c){
   cliLogado=c;
-  try{ cliNums=JSON.parse(localStorage.getItem("rp-nums-"+c.id)||"[]"); }catch{ cliNums=[]; }
   lastStatuses={};
   document.getElementById("cli-avatar").textContent=c.nome.charAt(0).toUpperCase();
   document.getElementById("cli-nome-top").textContent=c.nome;
   stopAllListeners();
+
   var refPed=DB.ref("pedidos");
   refPed.on("value",function(snap){
     var novos=snap.val()||{};
+
+    // ── Detecta automaticamente TODOS os pedidos do parceiro ──
+    // Compara clienteId (exato) OU nomeAvulso case-insensitive com nome/login do parceiro
+    var loginLower  = (c.login||"").toLowerCase();
+    var nomeLower   = (c.nome||"").toLowerCase();
+
+    Object.keys(novos).forEach(function(num){
+      var p = novos[num];
+      if(!p) return;
+      var ehMeu = false;
+
+      // 1. Match por clienteId exato
+      if(p.clienteId && p.clienteId === c.id) ehMeu = true;
+
+      // 2. Match por nomeAvulso case-insensitive (pedidos antigos)
+      if(!ehMeu && p.nomeAvulso){
+        var avulsoLower = p.nomeAvulso.toLowerCase();
+        if(avulsoLower === loginLower || avulsoLower === nomeLower) ehMeu = true;
+      }
+
+      // 3. Match por clienteId case-insensitive (logins com maiúscula/minúscula diferentes)
+      if(!ehMeu && p.clienteId){
+        // Busca o cliente pelo clienteId e compara login
+        var cDono = clientes[p.clienteId];
+        if(cDono && (cDono.login||"").toLowerCase() === loginLower) ehMeu = true;
+      }
+
+      // Adiciona à lista se for do parceiro e ainda não estiver
+      if(ehMeu && cliNums.indexOf(num) < 0){
+        cliNums.push(num);
+      }
+    });
+
+    // Salva lista atualizada
+    saveCliNums();
+
+    // Detecta mudanças de status
     cliNums.forEach(function(n){
       if(novos[n]&&lastStatuses[n]&&lastStatuses[n]!==novos[n].status){
         if(novos[n].status==="excluido"){
@@ -810,12 +847,17 @@ function doLoginCli(c){
       }
       if(novos[n]) lastStatuses[n]=novos[n].status;
     });
+
     pedidos=novos;
     renderCliPedidos();
     var el=document.getElementById("cli-live");
     if(el) el.textContent="ao vivo · "+new Date().toLocaleTimeString("pt-BR");
   });
   opListeners.push(refPed);
+
+  // Carrega lista salva do localStorage ANTES do Firebase responder
+  try{ cliNums=JSON.parse(localStorage.getItem("rp-nums-"+c.id)||"[]"); }catch{ cliNums=[]; }
+
   startAlertasCliente();
   goScreen("screen-cli-home");
 }
