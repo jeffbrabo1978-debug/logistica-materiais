@@ -426,12 +426,24 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div id="aba-relatorio" style="flex:1;padding:22px;overflow-y:auto;display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div><h3 style="font-weight:900;color:#fff;font-size:15px">Histórico de Pedidos</h3><p style="font-size:11px;color:#334155;margin-top:2px">Dados em tempo real</p></div>
-        <button onclick="exportExcel()" style="padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif">📥 Excel</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="exportExcel()" style="padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif">📥 Excel</button>
+        </div>
+      </div>
+      <!-- Barra de ações (aparece quando há selecionados) -->
+      <div id="bulk-action-bar" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <span id="bulk-selected-count" style="color:#fca5a5;font-size:13px;font-weight:700">0 selecionados</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="bulkDeleteSelected()" style="padding:8px 14px;border-radius:9px;border:none;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">🗑 Excluir Selecionados</button>
+          <button onclick="bulkDeleteAll()" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#f87171;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">🗑 Excluir Tudo</button>
+          <button onclick="cancelarSelecao()" style="padding:8px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#64748b;font-size:12px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">❌ Cancelar Seleção</button>
+        </div>
       </div>
       <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.07)">
         <table>
           <thead style="background:rgba(255,255,255,.04)">
             <tr>
+              <th style="width:40px;padding:10px 12px"><input type="checkbox" id="chk-all" onchange="toggleSelectAll(this)" style="width:16px;height:16px;cursor:pointer;accent-color:#10b981"/></th>
               <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Pedido</th>
               <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Parceiro</th>
               <th style="font-size:10px;font-weight:700;color:#4a607a;letter-spacing:1.5px;text-transform:uppercase">Status</th>
@@ -554,6 +566,21 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div style="display:flex;gap:10px">
       <button onclick="closeModal('modal-del-cli')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
       <button id="del-cli-btn" style="flex:1;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EXCLUSÃO EM MASSA -->
+<div class="modal-wrap" id="modal-bulk-del" onclick="closeModal('modal-bulk-del')">
+  <div class="modal-box" onclick="event.stopPropagation()" style="text-align:center">
+    <div style="font-size:36px;margin-bottom:10px">🗑️</div>
+    <h3 style="font-weight:900;color:#fff;font-size:18px;margin-bottom:8px">Confirmar exclusão</h3>
+    <p style="color:#64748b;font-size:13px;margin-bottom:6px">Você está prestes a excluir:</p>
+    <p id="bulk-del-count" style="color:#f87171;font-size:20px;font-weight:900;margin-bottom:18px">—</p>
+    <p style="color:#475569;font-size:12px;margin-bottom:20px">⚠️ Esta ação não pode ser desfeita.</p>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeModal('modal-bulk-del')" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:transparent;color:#64748b;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
+      <button id="bulk-del-confirm-btn" style="flex:1;padding:11px;border-radius:11px;border:none;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">🗑 Confirmar</button>
     </div>
   </div>
 </div>
@@ -1085,7 +1112,8 @@ function switchOpTab(tab){
   if(tab==="logs"){
     // Força leitura direta do Firebase ao abrir a aba
     DB.ref("logs").once("value",function(snap){
-      logs = snap.val()||{};
+      var val=snap.val();
+      logs = val||{};
       renderLogs();
     });
   }
@@ -1421,21 +1449,115 @@ function deletarCliente(id,nome){
 }
 
 // ── RELATÓRIO ─────────────────────────────────────────────
+var pedidosSelecionados = {};
+
 function renderRelatorio(){
   var tbody=document.getElementById("tabela-pedidos");
   var lista=Object.values(pedidos).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
-  if(!lista.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:32px;color:#334155">Nenhum pedido registrado.</td></tr>';return;}
+  if(!lista.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:#334155">Nenhum pedido registrado.</td></tr>';return;}
   var badge={
     criado:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)">📋 Criado</span>',
     separacao:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(59,130,246,.12);color:#3b82f6;border:1px solid rgba(59,130,246,.3)">📦 Separação</span>',
     pronto:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.3)">✅ Pronto</span>',
-    entregue:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)">🎁 Entregue</span>'
+    entregue:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.3)">🎁 Entregue</span>',
+    excluido:'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3)">❌ Excluído</span>'
   };
   tbody.innerHTML=lista.map(function(p){
     var c=p.clienteId?clientes[p.clienteId]:null;
     var nome=(c&&c.nome)||p.nomeAvulso||"—";
-    return '<tr><td style="font-family:\'DM Mono\',monospace;font-weight:900;color:#fff;font-size:14px">#'+p.numero+'</td><td style="color:#cbd5e1;font-size:13px">'+nome+'</td><td>'+(badge[p.status]||p.status)+'</td><td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace">'+fmtDate(p.createdAt)+'</td><td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace">'+fmtDate(p.updatedAt)+'</td><td style="text-align:right;font-weight:700;font-size:12px;color:'+(p.status==='entregue'?'#10b981':'#475569')+'">'+tempoTotal(p)+'</td></tr>';
+    var sel=pedidosSelecionados[p.numero]?"checked":"";
+    var rowBg=pedidosSelecionados[p.numero]?"background:rgba(239,68,68,.06);":"";
+    return '<tr style="'+rowBg+'" id="row-'+p.numero+'">'
+      +'<td style="padding:10px 12px"><input type="checkbox" '+sel+' onchange="toggleSelect(\''+p.numero+'\',this)" style="width:16px;height:16px;cursor:pointer;accent-color:#10b981"/></td>'
+      +'<td style="font-family:\'DM Mono\',monospace;font-weight:900;color:#fff;font-size:14px">#'+p.numero+'</td>'
+      +'<td style="color:#cbd5e1;font-size:13px">'+nome+'</td>'
+      +'<td>'+(badge[p.status]||p.status)+'</td>'
+      +'<td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace">'+fmtDate(p.createdAt)+'</td>'
+      +'<td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace">'+fmtDate(p.updatedAt)+'</td>'
+      +'<td style="text-align:right;font-weight:700;font-size:12px;color:'+(p.status==='entregue'?'#10b981':'#475569')+'">'+tempoTotal(p)+'</td>'
+      +'</tr>';
   }).join("");
+  atualizarBarraAcoes();
+}
+
+function toggleSelect(num, chk){
+  if(chk.checked){
+    pedidosSelecionados[num]=true;
+  } else {
+    delete pedidosSelecionados[num];
+  }
+  // Highlight da linha
+  var row=document.getElementById("row-"+num);
+  if(row) row.style.background=chk.checked?"rgba(239,68,68,.06)":"";
+  atualizarBarraAcoes();
+}
+
+function toggleSelectAll(chk){
+  var lista=Object.values(pedidos);
+  lista.forEach(function(p){
+    if(chk.checked){
+      pedidosSelecionados[p.numero]=true;
+    } else {
+      delete pedidosSelecionados[p.numero];
+    }
+  });
+  // Atualiza checkboxes individuais
+  document.querySelectorAll("#tabela-pedidos input[type=checkbox]").forEach(function(cb){
+    cb.checked=chk.checked;
+  });
+  // Highlight linhas
+  lista.forEach(function(p){
+    var row=document.getElementById("row-"+p.numero);
+    if(row) row.style.background=chk.checked?"rgba(239,68,68,.06)":"";
+  });
+  atualizarBarraAcoes();
+}
+
+function atualizarBarraAcoes(){
+  var qtd=Object.keys(pedidosSelecionados).length;
+  var bar=document.getElementById("bulk-action-bar");
+  var cnt=document.getElementById("bulk-selected-count");
+  if(bar){
+    bar.style.display=qtd>0?"flex":"none";
+  }
+  if(cnt) cnt.textContent=qtd+" pedido"+(qtd!==1?"s":"")+" selecionado"+(qtd!==1?"s":"");
+}
+
+function cancelarSelecao(){
+  pedidosSelecionados={};
+  document.querySelectorAll("#tabela-pedidos input[type=checkbox]").forEach(function(cb){ cb.checked=false; });
+  var chkAll=document.getElementById("chk-all");
+  if(chkAll) chkAll.checked=false;
+  document.querySelectorAll("#tabela-pedidos tr").forEach(function(row){ row.style.background=""; });
+  atualizarBarraAcoes();
+}
+
+function bulkDeleteSelected(){
+  var nums=Object.keys(pedidosSelecionados);
+  if(!nums.length){ toast("Nenhum pedido selecionado","warn"); return; }
+  document.getElementById("bulk-del-count").textContent=nums.length+" pedido"+(nums.length!==1?"s":"")+" selecionado"+(nums.length!==1?"s":"");
+  document.getElementById("bulk-del-confirm-btn").onclick=function(){
+    nums.forEach(function(num){ DB.ref("pedidos/"+num).remove(); });
+    registrarLog("Exclusão em massa",""+nums.length+" pedido"+(nums.length!==1?"s":"")+" excluído"+(nums.length!==1?"s":"")+" pelo operador");
+    pedidosSelecionados={};
+    closeModal("modal-bulk-del");
+    toast("✓ "+nums.length+" pedido"+(nums.length!==1?"s":"")+" excluído"+(nums.length!==1?"s":""),"warn");
+  };
+  showModal("modal-bulk-del");
+}
+
+function bulkDeleteAll(){
+  var lista=Object.values(pedidos);
+  if(!lista.length){ toast("Nenhum pedido para excluir","warn"); return; }
+  document.getElementById("bulk-del-count").textContent="TODOS os "+lista.length+" pedidos do relatório";
+  document.getElementById("bulk-del-confirm-btn").onclick=function(){
+    lista.forEach(function(p){ DB.ref("pedidos/"+p.numero).remove(); });
+    registrarLog("Exclusão total","Todos os "+lista.length+" pedidos excluídos pelo operador");
+    pedidosSelecionados={};
+    closeModal("modal-bulk-del");
+    toast("✓ Todos os pedidos excluídos","warn");
+  };
+  showModal("modal-bulk-del");
 }
 
 // ── LOGS ──────────────────────────────────────────────────
