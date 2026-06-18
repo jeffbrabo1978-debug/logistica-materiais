@@ -1079,8 +1079,7 @@ function startOpListeners(){
   var refLogs=DB.ref("logs");
   refLogs.on("value",function(snap){
     var val=snap.val();
-    logs = val||{};
-    // Sempre renderiza se estiver na aba, independente do estado anterior
+    logs=val||{};
     if(opTab==="logs") renderLogs();
   });
   opListeners.push(refPed,refCli,refLogs);
@@ -1110,10 +1109,11 @@ function switchOpTab(tab){
   if(tab==="relatorio") renderRelatorio();
   if(tab==="clientes")  renderClientes();
   if(tab==="logs"){
-    // Força leitura direta do Firebase ao abrir a aba
+    var tbody=document.getElementById("tabela-logs");
+    if(tbody) tbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:#334155">Carregando...</td></tr>';
     DB.ref("logs").once("value",function(snap){
       var val=snap.val();
-      logs = val||{};
+      logs=val||{};
       renderLogs();
     });
   }
@@ -1570,14 +1570,32 @@ function renderLogs(){
 
   // Ordena — logs sem campo data ficam no final
   lista.sort(function(a,b){
-    var da = a.data ? new Date(a.data) : new Date(0);
-    var db = b.data ? new Date(b.data) : new Date(0);
-    return db - da;
+    var da = a.data ? new Date(a.data).getTime() : 0;
+    var db2 = b.data ? new Date(b.data).getTime() : 0;
+    return db2 - da;
   });
 
   if(!lista.length){
     tbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:32px;color:#334155">Nenhuma alteração registrada.</td></tr>';
     return;
+  }
+
+  tbody.innerHTML=lista.map(function(l){
+    var acao     = l.acao     || l.action  || l.tipo   || "—";
+    var detalhes = l.detalhes || l.details || l.info   || "—";
+    var dataFmt  = l.dataFmt  || (l.data ? fmtDate(l.data) : "—");
+    var operador = l.operador || l.operator|| l.user   || "Operador";
+    var corAcao  = acao.indexOf("Exclus")>=0 || acao.indexOf("exclus")>=0 ? "#f87171"
+                 : acao.indexOf("senha")>=0  || acao.indexOf("Senha")>=0  ? "#f59e0b"
+                 : "#10b981";
+    return '<tr>'
+      +'<td style="color:#475569;font-size:11px;font-family:\'DM Mono\',monospace;white-space:nowrap">'+dataFmt+'</td>'
+      +'<td style="color:#94a3b8;font-size:12px;font-weight:600">'+operador+'</td>'
+      +'<td style="font-size:12px;font-weight:700;color:'+corAcao+'">'+acao+'</td>'
+      +'<td style="color:#64748b;font-size:12px">'+detalhes+'</td>'
+      +'</tr>';
+  }).join("");
+}
   }
 
   tbody.innerHTML=lista.map(function(l){
