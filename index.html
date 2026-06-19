@@ -1937,16 +1937,38 @@ document.addEventListener("click",function(e){
 });
 
 // ── INIT ──────────────────────────────────────────────────
-window.onload=function(){
-  document.getElementById("loading-screen").style.display="none";
-  // QR da tela inicial — usa URL válida do Netlify
+function iniciarApp(){
+  var ls = document.getElementById("loading-screen");
+  if(ls) ls.style.display="none";
   setTimeout(function(){
     var url = getSysURL();
     var c = document.getElementById("qr-cli-canvas");
     if(c) gerarQRCanvas(c, url, 130);
-  }, 400);
+  }, 500);
   carregarLoginSalvo();
   goScreen("screen-cli-auth");
+}
+
+// Tenta iniciar quando DOM estiver pronto
+if(document.readyState==="loading"){
+  document.addEventListener("DOMContentLoaded", iniciarApp);
+} else {
+  iniciarApp();
+}
+
+// Fallback: garante que abre em no máximo 3 segundos
+setTimeout(function(){
+  var ls = document.getElementById("loading-screen");
+  if(ls && ls.style.display !== "none"){
+    iniciarApp();
+  }
+}, 3000);
+
+window.onload = function(){
+  var ls = document.getElementById("loading-screen");
+  if(ls && ls.style.display !== "none"){
+    iniciarApp();
+  }
 };
 </script>
 </body>
