@@ -686,7 +686,7 @@ function closeModal(id){ document.getElementById(id).classList.remove("open"); }
 function gerarQRCanvas(canvas,texto,size){
   try{
     var div=document.createElement("div");
-    new QRCode(div,{text:texto,width:size,height:size,colorDark:"#10b981",colorLight:"#050e1a",correctLevel:QRCode.CorrectLevel.M});
+    new QRCode(div,{text:texto,width:size,height:size,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.Q});
     setTimeout(function(){
       var img=div.querySelector("img")||div.querySelector("canvas");
       if(!img) return;
@@ -698,7 +698,7 @@ function gerarQRCanvas(canvas,texto,size){
     var img2=new Image();
     img2.crossOrigin="anonymous";
     img2.onload=function(){canvas.getContext("2d").drawImage(img2,0,0,size,size);};
-    img2.src="https://api.qrserver.com/v1/create-qr-code/?size="+size+"x"+size+"&data="+encodeURIComponent(texto)+"&bgcolor=050e1a&color=10b981&margin=6";
+    img2.src="https://api.qrserver.com/v1/create-qr-code/?size="+size+"x"+size+"&data="+encodeURIComponent(texto)+"&bgcolor=ffffff&color=000000&margin=10&qzone=4&ecc=Q";
   }
 }
 
@@ -820,45 +820,41 @@ function doLoginCli(c){
   lastStatuses={};
   document.getElementById("cli-avatar").textContent=c.nome.charAt(0).toUpperCase();
   document.getElementById("cli-nome-top").textContent=c.nome;
+
+  // FIX: Carrega lista do localStorage ANTES de iniciar listener — evita duplicação
+  try{ cliNums=JSON.parse(localStorage.getItem("rp-nums-"+c.id)||"[]"); }catch(e){ cliNums=[]; }
+
   stopAllListeners();
+
+  var loginLower = (c.login||"").toLowerCase();
+  var nomeLower  = (c.nome||"").toLowerCase();
 
   var refPed=DB.ref("pedidos");
   refPed.on("value",function(snap){
     var novos=snap.val()||{};
 
-    // ── Detecta automaticamente TODOS os pedidos do parceiro ──
-    // Compara clienteId (exato) OU nomeAvulso case-insensitive com nome/login do parceiro
-    var loginLower  = (c.login||"").toLowerCase();
-    var nomeLower   = (c.nome||"").toLowerCase();
+    // Detecta pedidos do parceiro — usando Set para evitar duplicatas
+    var setNums = {};
+    cliNums.forEach(function(n){ setNums[n]=true; });
 
     Object.keys(novos).forEach(function(num){
       var p = novos[num];
       if(!p) return;
       var ehMeu = false;
-
-      // 1. Match por clienteId exato
       if(p.clienteId && p.clienteId === c.id) ehMeu = true;
-
-      // 2. Match por nomeAvulso case-insensitive (pedidos antigos)
       if(!ehMeu && p.nomeAvulso){
-        var avulsoLower = p.nomeAvulso.toLowerCase();
-        if(avulsoLower === loginLower || avulsoLower === nomeLower) ehMeu = true;
+        var av = p.nomeAvulso.toLowerCase();
+        if(av===loginLower||av===nomeLower) ehMeu = true;
       }
-
-      // 3. Match por clienteId case-insensitive (logins com maiúscula/minúscula diferentes)
       if(!ehMeu && p.clienteId){
-        // Busca o cliente pelo clienteId e compara login
         var cDono = clientes[p.clienteId];
-        if(cDono && (cDono.login||"").toLowerCase() === loginLower) ehMeu = true;
+        if(cDono && (cDono.login||"").toLowerCase()===loginLower) ehMeu = true;
       }
-
-      // Adiciona à lista se for do parceiro e ainda não estiver
-      if(ehMeu && cliNums.indexOf(num) < 0){
-        cliNums.push(num);
-      }
+      if(ehMeu) setNums[num]=true;
     });
 
-    // Salva lista atualizada
+    // Reconstrói cliNums sem duplicatas
+    cliNums = Object.keys(setNums);
     saveCliNums();
 
     // Detecta mudanças de status
@@ -881,10 +877,6 @@ function doLoginCli(c){
     if(el) el.textContent="ao vivo · "+new Date().toLocaleTimeString("pt-BR");
   });
   opListeners.push(refPed);
-
-  // Carrega lista salva do localStorage ANTES do Firebase responder
-  try{ cliNums=JSON.parse(localStorage.getItem("rp-nums-"+c.id)||"[]"); }catch{ cliNums=[]; }
-
   startAlertasCliente();
   goScreen("screen-cli-home");
 }
@@ -1033,14 +1025,41 @@ function renderCliPedidos(){
 function cliCard(num){
   var p=pedidos[num]; if(!p) return "";
   var s=STATUS[p.status];
+
+  // ── Detecta 48h em pronto ──
+  var horas48=false;
+  if(p.status==="pronto" && p.etapas && p.etapas.pronto){
+    var horasEmPronto=(new Date()-new Date(p.etapas.pronto))/3600000;
+    if(horasEmPronto>=48) horas48=true;
+  }
+
   var steps=ORDEM.map(function(key,i){
     var st=STATUS[key];var ativo=st.step<=s.step;var atual=st.step===s.step;
     var line=i<ORDEM.length-1?'<div class="prog-line" style="flex:1;height:2px;background:'+(STATUS[key].step<s.step?st.color:'rgba(255,255,255,.06)')+'"></div>':"";
     return '<div style="display:flex;align-items:center;'+(i<ORDEM.length-1?'flex:1':'')+'"><div class="prog-step" style="background:'+(ativo?st.color:'rgba(255,255,255,.05)')+';border-color:'+(ativo?st.color:'rgba(255,255,255,.08)')+';box-shadow:'+(atual?'0 0 14px '+st.color+'60':'none')+'">'+(ativo?st.icon:'')+'</div>'+line+'</div>';
   }).join("");
+
   var prontoMsg  =p.status==="pronto"  ?'<div style="margin-top:12px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:12px;color:#6ee7b7;font-weight:700;font-size:13px;text-align:center">🎉 Pronto! Vá ao balcão retirar.</div>':"";
   var entregueMsg=p.status==="entregue"?'<div style="margin-top:12px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:10px;padding:12px;color:#c4b5fd;font-weight:700;font-size:13px;text-align:center">🎁 Pedido entregue! Obrigado.</div>':"";
-  return '<div class="anim-slideIn" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:3px solid '+s.color+';border-radius:14px;padding:16px;margin-bottom:10px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px"><span style="font-family:\'DM Mono\',monospace;font-weight:900;font-size:20px;color:#fff;letter-spacing:2px">#'+p.numero+'</span><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;background:'+s.color+'18;border:1px solid '+s.color+'40;color:'+s.color+'">'+s.icon+' '+s.label+'</span><button onclick="cliRemovePedido(\''+num+'\')" style="background:none;border:none;color:#334155;cursor:pointer;font-size:14px;line-height:1">✕</button></div></div><div style="display:flex;align-items:center">'+steps+'</div><div style="color:#1e3a5f;font-size:10px;margin-top:8px;font-family:\'DM Mono\',monospace">Atualizado: '+fmtDate(p.updatedAt)+'</div>'+prontoMsg+entregueMsg+'</div>';
+
+  // Selo e estilo especial para 48h
+  var selo48    = horas48 ? '<span style="font-size:11px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.5);color:#f87171;animation:pulseGlow 1s ease-in-out infinite">⏰ ÚLTIMAS 24 HORAS</span>' : "";
+  var cardStyle = horas48
+    ? 'background:rgba(239,68,68,.07);border:1.5px solid #ef4444;border-left:3px solid #ef4444;border-radius:14px;padding:16px;margin-bottom:10px;animation:pulseGlow 1.5s ease-in-out infinite'
+    : 'background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-left:3px solid '+s.color+';border-radius:14px;padding:16px;margin-bottom:10px';
+
+  return '<div class="anim-slideIn" style="'+cardStyle+'">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
+    +'<span style="font-family:\'DM Mono\',monospace;font-weight:900;font-size:20px;color:#fff;letter-spacing:2px">#'+p.numero+'</span>'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +selo48
+    +'<span style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:99px;background:'+s.color+'18;border:1px solid '+s.color+'40;color:'+s.color+'">'+s.icon+' '+s.label+'</span>'
+    +'<button onclick="cliRemovePedido(\''+num+'\')" style="background:none;border:none;color:#334155;cursor:pointer;font-size:14px;line-height:1">✕</button>'
+    +'</div></div>'
+    +'<div style="display:flex;align-items:center">'+steps+'</div>'
+    +'<div style="color:#1e3a5f;font-size:10px;margin-top:8px;font-family:\'DM Mono\',monospace">Atualizado: '+fmtDate(p.updatedAt)+'</div>'
+    +prontoMsg+entregueMsg
+    +'</div>';
 }
 
 // ── OP LOGIN ──────────────────────────────────────────────
@@ -1294,23 +1313,49 @@ function criarPedidoOp(){
 
 // ── AUTOMAÇÃO 48h/72h ─────────────────────────────────────
 var alertas48hEnviados = {}; // controle para não enviar duplicado
+var cancelamentos72hFeitos = {}; // controle cancelamento 72h
 
 function verificarPrazosPronto(){
   Object.values(pedidos).forEach(function(p){
     if(p.status!=="pronto") return;
     if(!p.etapas||!p.etapas.pronto) return;
     var horasEmPronto=(new Date()-new Date(p.etapas.pronto))/3600000;
-    // Ao completar 48h → envia aviso ao parceiro UMA VEZ
+
+    // ── 72h: cancelamento automático ──
+    if(horasEmPronto>=72 && !cancelamentos72hFeitos[p.numero]){
+      cancelamentos72hFeitos[p.numero]=true;
+      var motivo="Cancelado automaticamente após 72h sem retirada.";
+      DB.ref("pedidos/"+p.numero).update({
+        status:"excluido",
+        updatedAt:new Date().toISOString(),
+        msgExclusao:motivo,
+        canceladoEm:new Date().toISOString(),
+        motivoCancelamento:motivo
+      });
+      if(p.clienteId){
+        var chave72="cancelamento72_"+p.numero;
+        DB.ref("alertas/"+p.clienteId+"/"+chave72).set({
+          pedido:p.numero,
+          msg:"❌ Pedido #"+p.numero+" foi cancelado automaticamente por não ter sido retirado no prazo de 72 horas.",
+          tipo:"cancelamento72h",
+          data:new Date().toISOString(),
+          lido:false
+        });
+      }
+      registrarLog("Cancelamento automático 72h","Pedido #"+p.numero+" cancelado por não retirada no prazo.");
+      return;
+    }
+
+    // ── 48h: aviso ao parceiro UMA VEZ ──
     if(horasEmPronto>=48 && !alertas48hEnviados[p.numero]){
       alertas48hEnviados[p.numero]=true;
-      // Grava notificação no Firebase para o parceiro ver
       if(p.clienteId){
-        var chave="alerta48_"+p.numero;
-        DB.ref("alertas/"+p.clienteId+"/"+chave).once("value",function(snap){
+        var chave48="alerta48_"+p.numero;
+        DB.ref("alertas/"+p.clienteId+"/"+chave48).once("value",function(snap){
           if(!snap.exists()){
-            DB.ref("alertas/"+p.clienteId+"/"+chave).set({
+            DB.ref("alertas/"+p.clienteId+"/"+chave48).set({
               pedido:p.numero,
-              msg:"⚠️ Pedido #"+p.numero+" será cancelado em 24 horas caso não faça a retirada.",
+              msg:"Pedido disponível para retirada. Prazo final: 24 horas. Após esse período, o pedido será cancelado automaticamente.",
               tipo:"aviso48h",
               data:new Date().toISOString(),
               lido:false
@@ -1599,32 +1644,47 @@ function renderLogs(){
 
 // ── EXCEL ─────────────────────────────────────────────────
 function exportExcel(){
-  var lista=Object.values(pedidos).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
-  var rows=lista.map(function(p){
-    var c=p.clienteId?clientes[p.clienteId]:null;
-    var e=p.etapas||{};
-    return {"Nº Pedido":p.numero,"Parceiro":(c&&c.nome)||p.nomeAvulso||"—","Login":(c&&c.login)||"—","Status":(STATUS[p.status]&&STATUS[p.status].label)||p.status,"Criação":fmtDate(p.createdAt),"Atualização":fmtDate(p.updatedAt),"Hora Criado":e.criado?fmtDate(e.criado):"—","Hora Separação":e.separacao?fmtDate(e.separacao):"—","Hora Pronto":e.pronto?fmtDate(e.pronto):"—","Hora Entregue":e.entregue?fmtDate(e.entregue):"—","T.Criado→Sep":e.criado&&e.separacao?minDiff(e.criado,e.separacao)+" min":"—","T.Sep→Pronto":e.separacao&&e.pronto?minDiff(e.separacao,e.pronto)+" min":"—","T.Pronto→Ent":e.pronto&&e.entregue?minDiff(e.pronto,e.entregue)+" min":"—","Tempo Total":tempoTotal(p)};
-  });
-  var ws=XLSX.utils.json_to_sheet(rows);
-  var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,"Pedidos",ws);
-  var dias={};
-  lista.forEach(function(p){var d=fmtDateSh(p.createdAt);dias[d]=(dias[d]||0)+1;});
-  var ws2=XLSX.utils.json_to_sheet(Object.entries(dias).map(function(e){return{"Data":e[0],"Qtd":e[1]};}));
-  XLSX.utils.book_append_sheet(wb,"Resumo por Dia",ws2);
-  XLSX.writeFile(wb,"logistica-"+fmtDateSh(new Date()).replace(/\//g,"-")+".xlsx");
-  toast("✓ Excel exportado!");
+  try{
+    var lista=Object.values(pedidos).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+    if(!lista.length){ toast("Nenhum pedido para exportar","warn"); return; }
+    var rows=lista.map(function(p){
+      var c=p.clienteId?clientes[p.clienteId]:null;
+      var e=p.etapas||{};
+      return {"Nº Pedido":p.numero,"Parceiro":(c&&c.nome)||p.nomeAvulso||"—","Login":(c&&c.login)||"—","Status":(STATUS[p.status]&&STATUS[p.status].label)||p.status,"Criação":fmtDate(p.createdAt),"Atualização":fmtDate(p.updatedAt),"Hora Criado":e.criado?fmtDate(e.criado):"—","Hora Separação":e.separacao?fmtDate(e.separacao):"—","Hora Pronto":e.pronto?fmtDate(e.pronto):"—","Hora Entregue":e.entregue?fmtDate(e.entregue):"—","T.Criado→Sep":e.criado&&e.separacao?minDiff(e.criado,e.separacao)+" min":"—","T.Sep→Pronto":e.separacao&&e.pronto?minDiff(e.separacao,e.pronto)+" min":"—","T.Pronto→Ent":e.pronto&&e.entregue?minDiff(e.pronto,e.entregue)+" min":"—","Tempo Total":tempoTotal(p)};
+    });
+    var ws=XLSX.utils.json_to_sheet(rows);
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,"Pedidos",ws);
+    var dias={};
+    lista.forEach(function(p){var d=fmtDateSh(p.createdAt);dias[d]=(dias[d]||0)+1;});
+    var ws2=XLSX.utils.json_to_sheet(Object.entries(dias).map(function(e){return{"Data":e[0],"Qtd":e[1]};}));
+    XLSX.utils.book_append_sheet(wb,"Resumo por Dia",ws2);
+    XLSX.writeFile(wb,"logistica-"+fmtDateSh(new Date()).replace(/\//g,"-")+".xlsx");
+    toast("✓ Excel exportado!");
+  }catch(e){
+    toast("Erro ao exportar Excel: "+e.message,"err");
+  }
 }
 
 // ── BACKUP ────────────────────────────────────────────────
 function backupJSON(){
-  var backup={exportadoEm:new Date().toLocaleString("pt-BR"),pedidos:pedidos,parceiros:Object.values(clientes).map(function(c){return{id:c.id,login:c.login,nome:c.nome,tel:c.tel||"",criadoEm:c.criadoEm};}),totalPedidos:Object.keys(pedidos).length,totalClientes:Object.keys(clientes).length};
-  var blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json;charset=utf-8;"});
-  var a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="backup-logistica-"+fmtDateSh(new Date()).replace(/\//g,"-")+".json";
-  a.click(); URL.revokeObjectURL(a.href);
-  toast("✓ Backup salvo!");
+  try{
+    var totalP=Object.keys(pedidos).length;
+    var totalC=Object.keys(clientes).length;
+    if(!totalP&&!totalC){ toast("Nenhum dado para backup","warn"); return; }
+    var backup={exportadoEm:new Date().toLocaleString("pt-BR"),pedidos:pedidos,parceiros:Object.values(clientes).map(function(c){return{id:c.id,login:c.login,nome:c.nome,tel:c.tel||"",criadoEm:c.criadoEm};}),totalPedidos:totalP,totalClientes:totalC};
+    var blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json;charset=utf-8;"});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="backup-logistica-"+fmtDateSh(new Date()).replace(/\//g,"-")+".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    toast("✓ Backup salvo!");
+  }catch(e){
+    toast("Erro ao gerar backup: "+e.message,"err");
+  }
 }
 
 // ── URL DO SISTEMA ────────────────────────────────────────
@@ -1644,7 +1704,7 @@ function gerarQRCanvas(canvas, texto, size){
     canvas.width  = size;
     canvas.height = size;
     var div = document.createElement("div");
-    new QRCode(div,{text:texto, width:size, height:size, colorDark:"#10b981", colorLight:"#050e1a", correctLevel:QRCode.CorrectLevel.M});
+    new QRCode(div,{text:texto, width:size, height:size, colorDark:"#000000", colorLight:"#ffffff", correctLevel:QRCode.CorrectLevel.Q});
     setTimeout(function(){
       var img = div.querySelector("img") || div.querySelector("canvas");
       if(!img) return;
@@ -1657,7 +1717,7 @@ function gerarQRCanvas(canvas, texto, size){
     var img2 = new Image();
     img2.crossOrigin = "anonymous";
     img2.onload = function(){ canvas.getContext("2d").drawImage(img2,0,0,size,size); };
-    img2.src = "https://api.qrserver.com/v1/create-qr-code/?size="+size+"x"+size+"&data="+encodeURIComponent(texto)+"&bgcolor=050e1a&color=10b981&margin=6";
+    img2.src = "https://api.qrserver.com/v1/create-qr-code/?size="+size+"x"+size+"&data="+encodeURIComponent(texto)+"&bgcolor=ffffff&color=000000&margin=10&qzone=4&ecc=Q";
   }
 }
 
