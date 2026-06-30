@@ -1133,7 +1133,13 @@ function switchOpTab(tab){
     DB.ref("logs").once("value",function(snap){
       var val=snap.val();
       logs=val||{};
-      renderLogs();
+      try{
+        renderLogs();
+      }catch(err){
+        if(tbody) tbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:#f87171">Erro ao carregar registros: '+err.message+'</td></tr>';
+      }
+    },function(err){
+      if(tbody) tbody.innerHTML='<tr><td colspan="4" style="text-align:center;padding:20px;color:#f87171">Erro ao conectar: '+err.message+'</td></tr>';
     });
   }
 }
@@ -1626,10 +1632,10 @@ function renderLogs(){
   }
 
   tbody.innerHTML=lista.map(function(l){
-    var acao     = l.acao     || l.action  || l.tipo   || "—";
-    var detalhes = l.detalhes || l.details || l.info   || "—";
+    var acao     = String(l.acao     || l.action  || l.tipo   || "—");
+    var detalhes = String(l.detalhes || l.details || l.info   || "—");
     var dataFmt  = l.dataFmt  || (l.data ? fmtDate(l.data) : "—");
-    var operador = l.operador || l.operator|| l.user   || "Operador";
+    var operador = String(l.operador || l.operator|| l.user   || "Operador");
     var corAcao  = acao.indexOf("Exclus")>=0 || acao.indexOf("exclus")>=0 ? "#f87171"
                  : acao.indexOf("senha")>=0  || acao.indexOf("Senha")>=0  ? "#f59e0b"
                  : "#10b981";
@@ -1645,19 +1651,35 @@ function renderLogs(){
 // ── EXCEL ─────────────────────────────────────────────────
 function exportExcel(){
   try{
-    var lista=Object.values(pedidos).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
+    var lista=Object.values(pedidos).filter(function(p){ return p && p.numero; }).sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);});
     if(!lista.length){ toast("Nenhum pedido para exportar","warn"); return; }
     var rows=lista.map(function(p){
       var c=p.clienteId?clientes[p.clienteId]:null;
       var e=p.etapas||{};
-      return {"Nº Pedido":p.numero,"Parceiro":(c&&c.nome)||p.nomeAvulso||"—","Login":(c&&c.login)||"—","Status":(STATUS[p.status]&&STATUS[p.status].label)||p.status,"Criação":fmtDate(p.createdAt),"Atualização":fmtDate(p.updatedAt),"Hora Criado":e.criado?fmtDate(e.criado):"—","Hora Separação":e.separacao?fmtDate(e.separacao):"—","Hora Pronto":e.pronto?fmtDate(e.pronto):"—","Hora Entregue":e.entregue?fmtDate(e.entregue):"—","T.Criado→Sep":e.criado&&e.separacao?minDiff(e.criado,e.separacao)+" min":"—","T.Sep→Pronto":e.separacao&&e.pronto?minDiff(e.separacao,e.pronto)+" min":"—","T.Pronto→Ent":e.pronto&&e.entregue?minDiff(e.pronto,e.entregue)+" min":"—","Tempo Total":tempoTotal(p)};
+      var statusLabel = (STATUS[p.status] && STATUS[p.status].label) || String(p.status||"—");
+      return {
+        "Nº Pedido": String(p.numero||"—"),
+        "Parceiro": String((c&&c.nome)||p.nomeAvulso||"—"),
+        "Login": String((c&&c.login)||"—"),
+        "Status": String(statusLabel),
+        "Criação": String(p.createdAt?fmtDate(p.createdAt):"—"),
+        "Atualização": String(p.updatedAt?fmtDate(p.updatedAt):"—"),
+        "Hora Criado": String(e.criado?fmtDate(e.criado):"—"),
+        "Hora Separação": String(e.separacao?fmtDate(e.separacao):"—"),
+        "Hora Pronto": String(e.pronto?fmtDate(e.pronto):"—"),
+        "Hora Entregue": String(e.entregue?fmtDate(e.entregue):"—"),
+        "T.Criado→Sep": String(e.criado&&e.separacao?minDiff(e.criado,e.separacao)+" min":"—"),
+        "T.Sep→Pronto": String(e.separacao&&e.pronto?minDiff(e.separacao,e.pronto)+" min":"—"),
+        "T.Pronto→Ent": String(e.pronto&&e.entregue?minDiff(e.pronto,e.entregue)+" min":"—"),
+        "Tempo Total": String(tempoTotal(p)||"—")
+      };
     });
     var ws=XLSX.utils.json_to_sheet(rows);
     var wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,"Pedidos",ws);
     var dias={};
     lista.forEach(function(p){var d=fmtDateSh(p.createdAt);dias[d]=(dias[d]||0)+1;});
-    var ws2=XLSX.utils.json_to_sheet(Object.entries(dias).map(function(e){return{"Data":e[0],"Qtd":e[1]};}));
+    var ws2=XLSX.utils.json_to_sheet(Object.entries(dias).map(function(e){return{"Data":String(e[0]),"Qtd":Number(e[1])};}));
     XLSX.utils.book_append_sheet(wb,"Resumo por Dia",ws2);
     XLSX.writeFile(wb,"logistica-"+fmtDateSh(new Date()).replace(/\//g,"-")+".xlsx");
     toast("✓ Excel exportado!");
